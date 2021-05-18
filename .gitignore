@@ -1,0 +1,10 @@
+# Default ignored files
+/.*/
+config.yaml
+go.sum
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.log
