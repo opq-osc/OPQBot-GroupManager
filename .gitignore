@@ -8,3 +8,4 @@ go.sum
 *.so
 *.dylib
 *.log
+_*

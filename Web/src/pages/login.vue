@@ -100,6 +100,7 @@ export default {
             rememberMe: this.rememberMe
           }).then(function (response) {
             if (response.data.code === 1) {
+              _this.$store.commit('User/pushFunc', { auth: response.data.code === 1, username: response.data.data })
               _this.$q.notify({
                 type: 'positive',
                 position: 'top',
@@ -144,10 +145,12 @@ export default {
   },
   mounted () {
     if (this.$store.state.User.auth) {
+      console.log('已登录')
       this.Jump(3)
     } else {
       this.tips = this.$route.query.info
       this.visible = false
+      this.$axios.get('/api/csrf')
       // this.$recaptchaLoaded().then(() => {
       //   console.log('recaptcha loaded')
       // })

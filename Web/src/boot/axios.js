@@ -22,6 +22,15 @@ axios.interceptors.request.use(
     return Promise.reject(error)
   }
 )
+axios.interceptors.response.use(res => {
+  if (res.data.code === 10010 || res.data.code === 10011) {
+    this.$router.replace('/login')
+  }
+  return res
+}, error => {
+  return Promise.reject('出错啦', error)
+})
+
 function getCookie (cname) {
   const name = cname + '='
   const ca = document.cookie.split(';')

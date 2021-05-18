@@ -3,9 +3,6 @@ package main
 import (
 	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/methods"
-	"github.com/kataras/iris/v12"
-	"github.com/kataras/iris/v12/sessions"
-	"github.com/mcoo/OPQBot"
 	"log"
 	"math/rand"
 	"net/http"
@@ -13,6 +10,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kataras/iris/v12"
+	"github.com/kataras/iris/v12/sessions"
+	"github.com/mcoo/OPQBot"
 )
 
 var (
@@ -87,7 +88,7 @@ func main() {
 				})
 				return
 			}
-			if v,ok := Config.CoreConfig.UserData[packet.FromUserID];ok {
+			if v, ok := Config.CoreConfig.UserData[packet.FromUserID]; ok {
 				if v.LastSignDay == time.Now().Day() {
 					b.Send(OPQBot.SendMsgPack{
 						SendToType:   OPQBot.SendToTypeGroup,
@@ -110,7 +111,7 @@ func main() {
 						CallbackFunc: nil,
 					})
 				}
-			}else{
+			} else {
 				v.Count = 1
 				v.LastSignDay = time.Now().Day()
 				Config.CoreConfig.UserData[packet.FromUserID] = v
@@ -136,7 +137,7 @@ func main() {
 				})
 				return
 			}
-			if v,ok := Config.CoreConfig.UserData[packet.FromUserID];ok {
+			if v, ok := Config.CoreConfig.UserData[packet.FromUserID]; ok {
 				if v.LastZanDay == time.Now().Day() {
 					b.Send(OPQBot.SendMsgPack{
 						SendToType:   OPQBot.SendToTypeGroup,
@@ -158,7 +159,7 @@ func main() {
 						CallbackFunc: nil,
 					})
 				}
-			}else{
+			} else {
 				v.LastZanDay = time.Now().Day()
 				Config.CoreConfig.UserData[packet.FromUserID] = v
 				err := Config.Save()
@@ -174,14 +175,14 @@ func main() {
 			}
 		}
 		if packet.Content == "积分" {
-			if v,ok := Config.CoreConfig.UserData[packet.FromUserID];ok {
+			if v, ok := Config.CoreConfig.UserData[packet.FromUserID]; ok {
 				b.Send(OPQBot.SendMsgPack{
 					SendToType:   OPQBot.SendToTypeGroup,
 					ToUserUid:    packet.FromGroupID,
-					Content:      OPQBot.SendTypeTextMsgContent{Content: OPQBot.MacroAt([]int64{packet.FromUserID}) + "你的积分为"+strconv.Itoa(v.Count)},
+					Content:      OPQBot.SendTypeTextMsgContent{Content: OPQBot.MacroAt([]int64{packet.FromUserID}) + "你的积分为" + strconv.Itoa(v.Count)},
 					CallbackFunc: nil,
 				})
-			}else{
+			} else {
 				b.Send(OPQBot.SendMsgPack{
 					SendToType:   OPQBot.SendToTypeGroup,
 					ToUserUid:    packet.FromGroupID,
@@ -190,7 +191,7 @@ func main() {
 				})
 			}
 		}
- 	})
+	})
 	if err != nil {
 		log.Println(err)
 	}
@@ -371,25 +372,25 @@ func main() {
 					Zan := ctx.FormValue("data[Zan]") == "true"
 					SignIn := ctx.FormValue("data[SignIn]") == "true"
 					Job := map[string]Config.Job{}
-					for k,v := range ctx.FormValues() {
+					for k, v := range ctx.FormValues() {
 						//log.Println(k,strings.HasPrefix(k,"data[Job]["),strings.Split(strings.TrimPrefix(k,"data[Job]["),"]"))
-						if strings.HasPrefix(k,"data[Job][") {
-							if v1 := strings.Split(strings.TrimPrefix(k,"data[Job]["),"]");len(v1) >=2 && len(v)>=1 {
+						if strings.HasPrefix(k, "data[Job][") {
+							if v1 := strings.Split(strings.TrimPrefix(k, "data[Job]["), "]"); len(v1) >= 2 && len(v) >= 1 {
 								switch v1[1] {
 								case "[Cron":
-									v2,_ := Job[v1[0]]
+									v2, _ := Job[v1[0]]
 									v2.Cron = v[0]
 									Job[v1[0]] = v2
 								case "[JobType":
-									v2,_ := Job[v1[0]]
-									v2.Type,_ = strconv.Atoi(v[0])
+									v2, _ := Job[v1[0]]
+									v2.Type, _ = strconv.Atoi(v[0])
 									Job[v1[0]] = v2
 								case "[Content":
-									v2,_ := Job[v1[0]]
-									v2.Content=v[0]
+									v2, _ := Job[v1[0]]
+									v2.Content = v[0]
 									Job[v1[0]] = v2
 								}
-								
+
 							}
 						}
 					}
@@ -406,7 +407,7 @@ func main() {
 						})
 						return
 					}
-					Config.CoreConfig.GroupConfig[id] = Config.GroupConfig{Job: Job,JoinVerifyType: JoinVerifyType, Welcome: Welcome, SignIn: SignIn, Zan: Zan, JoinVerifyTime: JoinVerifyTime, JoinAutoShutUpTime: JoinAutoShutUpTime, AdminUin: AdminUin, Menu: menuData, MenuKeyWord: menuKeyWordData, Enable: Enable, ShutUpWord: ShutUpWord, ShutUpTime: ShutUpTime}
+					Config.CoreConfig.GroupConfig[id] = Config.GroupConfig{Job: Job, JoinVerifyType: JoinVerifyType, Welcome: Welcome, SignIn: SignIn, Zan: Zan, JoinVerifyTime: JoinVerifyTime, JoinAutoShutUpTime: JoinAutoShutUpTime, AdminUin: AdminUin, Menu: menuData, MenuKeyWord: menuKeyWordData, Enable: Enable, ShutUpWord: ShutUpWord, ShutUpTime: ShutUpTime}
 					Config.Save()
 					_, _ = ctx.JSON(WebResult{
 						Code: 1,
@@ -559,7 +560,7 @@ func requireAuth(ctx iris.Context) {
 	if s.GetBooleanDefault("auth", false) {
 		ctx.Next()
 	} else {
-		_, _ = ctx.JSON(WebResult{Code: 1, Info: "未登录!", Data: nil})
+		_, _ = ctx.JSON(WebResult{Code: 10010, Info: "未登录!", Data: nil})
 		return
 	}
 }

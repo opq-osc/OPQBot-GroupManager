@@ -307,6 +307,7 @@
 export default {
   name: 'PageIndex',
   mounted: function () {
+    this.$axios.get('/api/csrf')
     this.$axios.get('/api/admin/groups').then((res) => {
       if (res.data.code === 1) {
         this.groups = res.data.data.TroopList
