@@ -3,7 +3,7 @@
     <div class="col-md-2 col-sm-4 col-12 q-pa-sm">
     <q-list bordered padding class="overflow-hidden rounded-borders">
       <q-item-label header>默认群配置</q-item-label>
-      <q-item clickable @click="getGroupConfig(-1)">
+      <q-item clickable @click="getGroupConfig(-1)" active-class="bg-grey-3" :active='selectGroup.GroupId===-1'>
          <q-item-section avatar>
           <q-avatar color="primary" text-color="white" icon="supervisor_account">
           </q-avatar>
@@ -220,9 +220,10 @@
                   <div class="q-gutter-y-sm column">
                    <q-input dense outlined label="任务名称" stack-label v-model="tmp" />
                    <q-input dense outlined  label="Cron" stack-label v-model="addJob.Cron" />
-                   <q-select dense emit-value map-options outlined v-model="addJob.JobType" :options="TaskOptions" label="任务类型" />
-
+                   <q-select dense emit-value map-options outlined v-model="addJob.Type" :options="TaskOptions" label="任务类型" />
+                  <q-input v-show="addJob.Type === 1" dense outlined label="标题" stack-label v-model="addJob.title" />
                    <q-input
+                   v-show="addJob.Type === 1 || addJob.Type===4"
                    v-model="addJob.Content"
                     outlined
                     stack-label
@@ -252,10 +253,10 @@
         <q-item-section top>
           <q-item-label lines="1">
             <span class="text-weight-medium">{{ key }}</span>
-            <span class="text-grey-8"> - {{ getJobTitle(v.Type) }}</span>
+            <span class="text-grey-8"> - {{ getJobTitle(v.Type) }} -  {{ v.Cron }}</span>
           </q-item-label>
           <q-item-label caption lines="1">
-             {{ v.Cron }}
+             {{ v.Content }}
           </q-item-label>
         </q-item-section>
 
@@ -330,19 +331,19 @@ export default {
       TaskOptions: [
         {
           label: '发送公告',
-          value: 0
-        },
-        {
-          label: '全局禁言',
           value: 1
         },
         {
-          label: '全局解禁',
+          label: '全局禁言',
           value: 2
         },
         {
-          label: '发送消息',
+          label: '全局解禁',
           value: 3
+        },
+        {
+          label: '发送消息',
+          value: 4
         }
       ],
       JoinVerifyTypeOptions: [
@@ -391,9 +392,35 @@ export default {
       return isempty
     },
     addJobF: function (k, v) {
-      this.$set(this.selectGroupConfig.Job, this.tmp, this.addJob)
-      this.setGroupConfig(this.selectGroup.GroupId, this.selectGroupConfig)
-      this.addJob = {}
+      this.$axios.post('/api/admin/job/add', { csrfToken: this.$cookie('OPQWebCSRF'), type: this.addJob.Type, jobName: this.tmp, id: this.selectGroup.GroupId, span: this.addJob.Cron, title: this.addJob.title, content: this.addJob.Content })
+        .then(res => {
+          if (res.data.code === 1) {
+            this.$set(this.selectGroupConfig.Job, this.tmp, this.addJob)
+            console.log(this.selectGroupConfig.Job)
+            this.addJob = {}
+            this.$q.notify({
+              type: 'positive',
+              position: 'top',
+              message: res.data.info,
+              icon: 'fa fa-check'
+            })
+          } else {
+            this.$q.notify({
+              type: 'negative',
+              position: 'top',
+              message: res.data.info,
+              icon: 'fa fa-check'
+            })
+          }
+        })
+        .catch(err => {
+          this.$q.notify({
+            type: 'negative',
+            position: 'top',
+            message: err.message,
+            icon: 'fa fa-check'
+          })
+        })
     },
     delJobF: function (k) {
       this.$q.dialog({
@@ -403,8 +430,33 @@ export default {
         persistent: true,
         ok: '删除'
       }).onOk(() => {
-        this.$delete(this.selectGroupConfig.Job, k)
-        this.setGroupConfig(this.selectGroup.GroupId, this.selectGroupConfig)
+        this.$axios.post('/api/admin/job/del', { csrfToken: this.$cookie('OPQWebCSRF'), jobName: k, id: this.selectGroup.GroupId })
+          .then(res => {
+            if (res.data.code === 1) {
+              this.$delete(this.selectGroupConfig.Job, k)
+              this.$q.notify({
+                type: 'positive',
+                position: 'top',
+                message: res.data.info,
+                icon: 'fa fa-check'
+              })
+            } else {
+              this.$q.notify({
+                type: 'negative',
+                position: 'top',
+                message: res.data.info,
+                icon: 'fa fa-check'
+              })
+            }
+          })
+          .catch(err => {
+            this.$q.notify({
+              type: 'negative',
+              position: 'top',
+              message: err.message,
+              icon: 'fa fa-check'
+            })
+          })
       })
     },
     getJobTitle: function (id) {

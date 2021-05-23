@@ -1,12 +1,13 @@
 package Config
 
 import (
-	"github.com/fsnotify/fsnotify"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/fsnotify/fsnotify"
+	"gopkg.in/yaml.v3"
 )
 
 type CoreConfigStruct struct {
@@ -37,6 +38,7 @@ type UserData struct {
 type Job struct {
 	Cron    string
 	Type    int
+	Title   string
 	Content string
 }
 type GroupConfig struct {

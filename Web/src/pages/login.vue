@@ -144,17 +144,41 @@ export default {
     }
   },
   mounted () {
-    if (this.$store.state.User.auth) {
-      console.log('已登录')
-      this.Jump(3)
-    } else {
-      this.tips = this.$route.query.info
-      this.visible = false
-      this.$axios.get('/api/csrf')
-      // this.$recaptchaLoaded().then(() => {
-      //   console.log('recaptcha loaded')
-      // })
-    }
+    console.log(this.$store.state.User.auth)
+
+    this.$axios.get('api/status').then((response) => {
+      if (response.data.code === 1) {
+        this.$store.commit('User/pushFunc', { auth: response.data.code === 1, username: response.data.data })
+        console.log('已登录')
+        this.Jump(3)
+      } else {
+        this.tips = this.$route.query.info
+        this.visible = false
+      }
+    }).catch((error) => {
+      console.log(error.message)
+      let title = '错误'
+      if (error.message === 'Network Error') {
+        error.message = '与后端连接出现问题，网站暂时无法使用！'
+        title = '网络错误'
+      }
+      this.$router.replace({
+        path: '/error',
+        query: { info: error.message, title: title, back: '/login' }
+      })
+    })
+
+    // if (this.$store.state.User.auth) {
+    //   console.log('已登录')
+    //   this.Jump(3)
+    // } else {
+    //   this.tips = this.$route.query.info
+    //   this.visible = false
+    //   this.$axios.get('/api/csrf')
+    //   // this.$recaptchaLoaded().then(() => {
+    //   //   console.log('recaptcha loaded')
+    //   // })
+    // }
   }
 }
 </script>

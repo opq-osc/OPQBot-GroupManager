@@ -36,6 +36,22 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
+	c := NewBotCronManager()
+	c.Start()
+	// c := cron.New()
+	// _, err = c.AddFunc("*/1 * * * *", func() {
+	// 	log.Println("周期任务测试")
+	// })
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+	// c.Start()
+	// _, err = c.AddFunc("*/2 * * * *", func() {
+	// 	log.Println("周期任务测试2")
+	// })
+	// if err != nil {
+	// 	log.Println(err)
+	// }
 	// 黑名单优先级高于白名单
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, BlackGroupList, WhiteGroupList, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
@@ -78,6 +94,7 @@ func main() {
 			}
 			return
 		}
+
 		if packet.Content == "签到" {
 			if !c.SignIn {
 				b.Send(OPQBot.SendMsgPack{
@@ -249,6 +266,14 @@ func main() {
 				router.ServeHTTP(w, r)
 			})
 			app.HandleDir("/", iris.Dir("./Web/dist/spa"))
+			app.Get("/api/csrf", func(ctx iris.Context) {
+				s := sess.Start(ctx)
+				salt := int(time.Now().Unix())
+				keyTmp := methods.Md5V(strconv.Itoa(salt + rand.Intn(100)))
+				s.Set("OPQWebCSRF", keyTmp)
+				ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
+				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: s.Get("username")})
+			})
 			app.Get("/api/status", func(ctx iris.Context) {
 				s := sess.Start(ctx)
 				salt := int(time.Now().Unix())
@@ -279,17 +304,246 @@ func main() {
 				}
 
 			})
+			// job周期任务读取
+			Config.Lock.RLock()
+			for k, v := range Config.CoreConfig.GroupConfig {
+				for k1, v2 := range v.Job {
+					switch v2.Type {
+					case 1:
+						err = c.AddJob(k, k1, v2.Cron, func() {
+							log.Print("执行任务" + k1)
+							if b.Announce(v2.Title, v2.Content, 0, 10, k) != nil {
+								log.Print(err)
+							}
+						})
+						if err != nil {
+							log.Print("添加任务" + k1 + "出现错误" + err.Error())
+						}
+					case 2:
+						err = c.AddJob(k, k1, v2.Cron, func() {
+							log.Print("执行任务" + k1)
+							if b.SetForbidden(0, 1, k, 0) != nil {
+								log.Print(err)
+							}
+						})
+						if err != nil {
+							log.Print("添加任务" + k1 + "出现错误" + err.Error())
+						}
+					case 3:
+						err = c.AddJob(k, k1, v2.Cron, func() {
+							log.Print("执行任务" + k1)
+							if b.SetForbidden(0, 0, k, 0) != nil {
+								log.Print(err)
+							}
+						})
+						if err != nil {
+							log.Print("添加任务" + k1 + "出现错误" + err.Error())
+						}
+					case 4:
+						err = c.AddJob(k, k1, v2.Cron, func() {
+							log.Print("执行任务" + k1)
+							b.Send(OPQBot.SendMsgPack{
+								SendToType: OPQBot.SendToTypeGroup,
+								ToUserUid:  k,
+								Content: OPQBot.SendTypeTextMsgContent{
+									Content: v2.Content,
+								},
+							})
+						})
+						if err != nil {
+							log.Print("添加任务" + k1 + "出现错误" + err.Error())
+						}
+					}
+				}
+			}
+			Config.Lock.RUnlock()
 			needAuth := app.Party("/api/admin", requireAuth)
 			{
+				rJob := needAuth.Party("/job")
+				{
+					rJob.Post("/add", func(ctx iris.Context) {
+						ids := ctx.FormValue("id")
+						id, err := strconv.ParseInt(ids, 10, 64)
+						if err != nil {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							return
+						}
+						if id == -1 {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: "默认群禁止添加周期任务", Data: nil})
+							return
+						}
+						span := ctx.FormValue("span")
+						jobName := ctx.FormValue("jobName")
+						if jobName == "" {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: "jobName为空", Data: nil})
+							return
+						}
+						cronType, _ := strconv.Atoi(ctx.FormValue("type"))
+						switch cronType {
+						// 公告
+						case 1:
+							title := ctx.FormValue("title")
+							content := ctx.FormValue("content")
+							err = c.AddJob(id, jobName, span, func() {
+								log.Print("执行任务" + jobName)
+								if b.Announce(title, content, 0, 10, id) != nil {
+									log.Print(err)
+								}
+							})
+							if err != nil {
+								_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+								return
+							} else {
+								job := Config.Job{Type: cronType, Cron: span, Title: title, Content: content}
+								Config.Lock.Lock()
+								defer Config.Lock.Unlock()
+								if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+									v.Job[jobName] = job
+									Config.CoreConfig.GroupConfig[id] = v
+								} else {
+									v = Config.CoreConfig.DefaultGroupConfig
+									v.Job[jobName] = job
+									Config.CoreConfig.GroupConfig[id] = v
+								}
+								Config.Save()
+								_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+								return
+							}
+						// 全局禁言
+						case 2:
+							err = c.AddJob(id, jobName, span, func() {
+								log.Print("执行任务" + jobName)
+								if b.SetForbidden(0, 1, id, 0) != nil {
+									log.Print(err)
+								}
+							})
+							if err != nil {
+								_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+								return
+							} else {
+								job := Config.Job{Type: cronType, Cron: span}
+								Config.Lock.Lock()
+								defer Config.Lock.Unlock()
+								if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+									v.Job[jobName] = job
+									Config.CoreConfig.GroupConfig[id] = v
+								} else {
+									v = Config.CoreConfig.DefaultGroupConfig
+									v.Job[jobName] = job
+									Config.CoreConfig.GroupConfig[id] = v
+								}
+								Config.Save()
+								_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+								return
+							}
+						// 解除全局禁言
+						case 3:
+							err = c.AddJob(id, jobName, span, func() {
+								log.Print("执行任务" + jobName)
+								if b.SetForbidden(0, 0, id, 0) != nil {
+									log.Print(err)
+								}
+							})
+							if err != nil {
+								_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+								return
+							} else {
+								job := Config.Job{Type: cronType, Cron: span}
+								Config.Lock.Lock()
+								defer Config.Lock.Unlock()
+								if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+									v.Job[jobName] = job
+									Config.CoreConfig.GroupConfig[id] = v
+								} else {
+									v = Config.CoreConfig.DefaultGroupConfig
+									v.Job[jobName] = job
+									Config.CoreConfig.GroupConfig[id] = v
+								}
+								Config.Save()
+								_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+								return
+							}
+						case 4:
+							// title := ctx.FormValue("title")
+							content := ctx.FormValue("content")
+							err = c.AddJob(id, jobName, span, func() {
+								log.Print("执行任务" + jobName)
+								b.Send(OPQBot.SendMsgPack{
+									SendToType: OPQBot.SendToTypeGroup,
+									ToUserUid:  id,
+									Content: OPQBot.SendTypeTextMsgContent{
+										Content: content,
+									},
+								})
+							})
+							if err != nil {
+								_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+								return
+							} else {
+								job := Config.Job{Type: cronType, Cron: span, Content: content}
+								Config.Lock.Lock()
+								defer Config.Lock.Unlock()
+								if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+									v.Job[jobName] = job
+									Config.CoreConfig.GroupConfig[id] = v
+								} else {
+									v = Config.CoreConfig.DefaultGroupConfig
+									v.Job[jobName] = job
+									Config.CoreConfig.GroupConfig[id] = v
+								}
+								Config.Save()
+								_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+								return
+							}
+						default:
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: "类型不存在", Data: nil})
+							return
+						}
+					})
+					rJob.Post("/del", func(ctx iris.Context) {
+						ids := ctx.FormValue("id")
+						id, err := strconv.ParseInt(ids, 10, 64)
+						if err != nil {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							return
+						}
+						if id == -1 {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: "默认群禁止删除周期任务", Data: nil})
+							return
+						}
+						jobName := ctx.FormValue("jobName")
+						if jobName == "" {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: "jobName为空", Data: nil})
+							return
+						}
+						err = c.Remove(id, jobName)
+
+						if err != nil {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							return
+						}
+						Config.Lock.Lock()
+						defer Config.Lock.Unlock()
+						if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+							delete(v.Job, jobName)
+							Config.CoreConfig.GroupConfig[id] = v
+						} else {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: "Group在配置文件中不存在！", Data: nil})
+							return
+						}
+						Config.Save()
+						_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+					})
+				}
 				needAuth.Post("/getGroupMember", func(ctx iris.Context) {
 					ids := ctx.FormValue("id")
 					id, err := strconv.ParseInt(ids, 10, 64)
-					if id == -1 {
-						_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: []int{}})
-						return
-					}
 					if err != nil {
 						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+						return
+					}
+					if id == -1 {
+						_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: []int{}})
 						return
 					}
 
@@ -581,9 +835,9 @@ func beforeCsrf(ctx iris.Context) {
 		if key := s.GetStringDefault("OPQWebCSRF", ""); key != "" && (ctx.GetHeader("csrfToken") == key || ctx.FormValue("csrfToken") == key) {
 			ctx.Next()
 		} else {
-			log.Println(key, "-", ctx.FormValue("csrfToken"))
+			// log.Println(key, "-", ctx.FormValue("csrfToken"))
 			ctx.StatusCode(419)
-			_, _ = ctx.Text("CSRF Error!")
+			_, _ = ctx.JSON(WebResult{Code: 419, Info: "CSRF Error!", Data: nil})
 			return
 		}
 	} else {
