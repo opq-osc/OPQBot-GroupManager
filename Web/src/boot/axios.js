@@ -2,7 +2,7 @@ import Vue from 'vue'
 import axios from 'axios'
 import { stringify } from 'qs'
 axios.defaults.withCredentials = true
-axios.defaults.baseURL = window.location.protocol + '//' + window.location.hostname + ':8888/'
+// axios.defaults.baseURL = window.location.protocol + '//' + window.location.hostname + ':8888/'
 
 axios.interceptors.request.use(
   (config) => {
