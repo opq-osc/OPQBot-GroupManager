@@ -1,5 +1,6 @@
 # Default ignored files
 /.*/
+/.*
 /*.ttf
 config.yaml
 go.sum
@@ -10,3 +11,5 @@ go.sum
 *.dylib
 *.log
 _*
+dist/
+dist/
