@@ -2,13 +2,20 @@ package main
 
 import (
 	"OPQBot-QQGroupManager/Config"
+	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/methods"
+	"embed"
+	"encoding/base64"
+	"io/fs"
 	"log"
 	"math/rand"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kataras/iris/v12"
@@ -27,6 +34,9 @@ type WebResult struct {
 	Data interface{} `json:"data"`
 }
 
+//go:embed Web/dist/spa
+var staticFs embed.FS
+
 func main() {
 	log.Println("QQ Group Manager✈️" + version)
 	b := OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)
@@ -36,22 +46,13 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
+	VerifyNum := map[string]*struct {
+		Status bool
+		Code   string
+	}{}
+	VerifyLock := sync.Mutex{}
 	c := NewBotCronManager()
 	c.Start()
-	// c := cron.New()
-	// _, err = c.AddFunc("*/1 * * * *", func() {
-	// 	log.Println("周期任务测试")
-	// })
-	// if err != nil {
-	// 	log.Println(err)
-	// }
-	// c.Start()
-	// _, err = c.AddFunc("*/2 * * * *", func() {
-	// 	log.Println("周期任务测试2")
-	// })
-	// if err != nil {
-	// 	log.Println(err)
-	// }
 	// 黑名单优先级高于白名单
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, BlackGroupList, WhiteGroupList, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
@@ -94,7 +95,45 @@ func main() {
 			}
 			return
 		}
-
+		if v, _ := regexp.MatchString(`[0-9]{6}`, packet.Content); v {
+			VerifyLock.Lock()
+			if v1, ok := VerifyNum[strconv.FormatInt(packet.FromUserID, 10)+"|"+strconv.FormatInt(packet.FromGroupID, 10)]; ok {
+				if v1.Code == packet.Content {
+					v1.Status = true
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypeGroup,
+						ToUserUid:  packet.FromGroupID,
+						Content: OPQBot.SendTypeTextMsgContent{
+							Content: OPQBot.MacroAt([]int64{packet.FromUserID}) + "验证成功",
+						},
+					})
+				}
+			}
+			VerifyLock.Unlock()
+		}
+		if packet.Content == "刷新验证码" {
+			VerifyLock.Lock()
+			if v1, ok := VerifyNum[strconv.FormatInt(packet.FromUserID, 10)+"|"+strconv.FormatInt(packet.FromGroupID, 10)]; ok {
+				picB, n, err := draw.Draw6Number()
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				v1.Code = n
+				VerifyNum[strconv.FormatInt(packet.FromUserID, 10)+"|"+strconv.FormatInt(packet.FromGroupID, 10)] = v1
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypeGroup,
+					ToUserUid:  packet.FromGroupID,
+					Content: OPQBot.SendTypePicMsgByBase64Content{
+						Content: OPQBot.MacroAt([]int64{packet.FromUserID}) + "请在5分钟内输入上方图片验证码！否则会被移出群,若看不清楚可以输入 刷新验证码\n" + OPQBot.MacroId(),
+						Base64:  base64.StdEncoding.EncodeToString(picB),
+						Flash:   false,
+					},
+				})
+			}
+			VerifyLock.Unlock()
+			return
+		}
 		if packet.Content == "签到" {
 			if !c.SignIn {
 				b.Send(OPQBot.SendMsgPack{
@@ -213,7 +252,74 @@ func main() {
 		log.Println(err)
 	}
 	err = b.AddEvent(OPQBot.EventNameOnGroupJoin, func(botQQ int64, packet *OPQBot.GroupJoinPack) {
+		Config.Lock.RLock()
+		defer Config.Lock.RUnlock()
+		var c Config.GroupConfig
+		if v, ok := Config.CoreConfig.GroupConfig[packet.EventMsg.FromUin]; ok {
+			c = v
+		} else {
+			c = Config.CoreConfig.DefaultGroupConfig
+		}
+		if !c.Enable {
+			return
+		}
+		switch c.JoinVerifyType {
+		case 1: // 图片验证码
+			picB, n, err := draw.Draw6Number()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			b.Send(OPQBot.SendMsgPack{
+				SendToType: OPQBot.SendToTypeGroup,
+				ToUserUid:  packet.EventMsg.FromUin,
+				Content: OPQBot.SendTypePicMsgByBase64Content{
+					Content: OPQBot.MacroAt([]int64{packet.EventData.UserID}) + "请在5分钟内输入上方图片验证码！否则会被移出群,若看不清楚可以输入 刷新验证码\n" + OPQBot.MacroId(),
+					Base64:  base64.StdEncoding.EncodeToString(picB),
+					Flash:   false,
+				},
+				CallbackFunc: func(Code int, Info string, record OPQBot.MyRecord) {
+					if record.MsgSeq == 0 {
+						log.Println("验证码信息没有发送成功！")
+					} else {
+						VerifyLock.Lock()
+						VerifyNum[strconv.FormatInt(packet.EventData.UserID, 10)+"|"+strconv.FormatInt(packet.EventMsg.FromUin, 10)] = &struct {
+							Status bool
+							Code   string
+						}{Status: false, Code: n}
+						VerifyLock.Unlock()
+						time.Sleep(time.Duration(c.JoinVerifyTime) * time.Second)
+						VerifyLock.Lock()
+						log.Println(VerifyNum)
+						if v, ok := VerifyNum[strconv.FormatInt(packet.EventData.UserID, 10)+"|"+strconv.FormatInt(packet.EventMsg.FromUin, 10)]; ok {
+							if !v.Status {
+								b.Send(OPQBot.SendMsgPack{
+									SendToType: OPQBot.SendToTypeGroup,
+									ToUserUid:  packet.EventMsg.FromUin,
+									Content: OPQBot.SendTypeTextMsgContent{
+										Content: OPQBot.MacroAt([]int64{packet.EventData.UserID}) + "验证超时,再见!",
+									},
+									CallbackFunc: func(Code int, Info string, record OPQBot.MyRecord) {
+										b.KickGroupMember(packet.EventMsg.FromUin, packet.EventData.UserID)
+									},
+								})
+							} else {
+								delete(VerifyNum, strconv.FormatInt(packet.EventData.UserID, 10)+"|"+strconv.FormatInt(packet.EventMsg.FromUin, 10))
+							}
+						}
+						VerifyLock.Unlock()
+					}
+				},
+			})
 
+		default:
+		}
+		if c.Welcome != "" {
+			b.SendGroupTextMsg(packet.EventMsg.FromUin, c.Welcome)
+		}
+		if c.JoinAutoShutUpTime != 0 {
+			b.SetForbidden(1, c.JoinAutoShutUpTime, packet.EventMsg.FromUin, packet.EventData.UserID)
+		}
 	})
 	err = b.AddEvent(OPQBot.EventNameOnConnected, func() {
 		log.Println("连接服务器成功")
@@ -238,7 +344,26 @@ func main() {
 					log.Println(err)
 				}
 			}
+			fads, _ := fs.Sub(staticFs, "Web/dist/spa")
 
+			if Config.CoreConfig.ReverseProxy != "" {
+				// target, err := url.Parse(Config.CoreConfig.ReverseProxy)
+				if err != nil {
+					panic(err)
+				}
+				app.Get("{root:path}", func(ctx iris.Context) {
+					director := func(r *http.Request) {
+						r.Host = Config.CoreConfig.ReverseProxy
+						r.URL, _ = url.Parse(r.Host + "/" + ctx.Path())
+					}
+					p := &httputil.ReverseProxy{Director: director}
+					p.ServeHTTP(ctx.ResponseWriter(), ctx.Request())
+				})
+			} else {
+				app.HandleDir("/", http.FS(fads))
+			}
+
+			// app.HandleDir("/", iris.Dir("./Web/dist/spa"))
 			Config.Lock.Unlock()
 			app.Use(beforeCsrf)
 			app.Use(sess.Handler())
@@ -262,10 +387,9 @@ func main() {
 						}
 					}
 				}
-
+				// log.Println(r.URL.Path)
 				router.ServeHTTP(w, r)
 			})
-			app.HandleDir("/", iris.Dir("./Web/dist/spa"))
 			app.Get("/api/csrf", func(ctx iris.Context) {
 				s := sess.Start(ctx)
 				salt := int(time.Now().Unix())

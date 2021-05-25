@@ -4,12 +4,16 @@ go 1.16
 
 require (
 	github.com/Joker/hpp v1.0.0 // indirect
+	github.com/fogleman/gg v1.3.0
 	github.com/fsnotify/fsnotify v1.4.9
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/kataras/iris/v12 v12.2.0-alpha2.0.20210427211137-fa175eb84754
-	github.com/mcoo/OPQBot v0.1.3-0.20210515025018-6a990e62966a
-	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/mcoo/OPQBot v0.1.5
+	github.com/mcoo/requests v0.0.2 // indirect
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/smartystreets/goconvey v1.6.4 // indirect
+	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
-replace github.com/mcoo/OPQBot => G:\Project\OPQBot
+// replace github.com/mcoo/OPQBot => G:\Project\OPQBot

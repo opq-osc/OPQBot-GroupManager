@@ -1,5 +1,5 @@
 <template>
-  <q-page class="row">
+  <q-page class="fit row wrap justify-start items-start content-start">
     <div class="col-md-2 col-sm-4 col-12 q-pa-sm">
     <q-list bordered padding class="overflow-hidden rounded-borders">
       <q-item-label header>默认群配置</q-item-label>

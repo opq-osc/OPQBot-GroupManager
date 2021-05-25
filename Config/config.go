@@ -23,6 +23,7 @@ type CoreConfigStruct struct {
 		Url string
 		QQ  int64
 	}
+	ReverseProxy       string
 	DefaultGroupConfig GroupConfig
 	SuperAdminUin      int64
 	WhiteGroupList     []int64
