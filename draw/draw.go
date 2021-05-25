@@ -3,13 +3,21 @@ package draw
 import (
 	"bytes"
 	"crypto/rand"
+	_ "embed"
 	_ "image/jpeg"
 	"image/png"
+	"io/ioutil"
 	"math/big"
 
 	"github.com/fogleman/gg"
 )
 
+//go:embed techno-hideo-1.ttf
+var ttf []byte
+
+func init() {
+	ioutil.WriteFile("./techno-hideo-1.ttf", ttf, 0777)
+}
 func Draw6Number() ([]byte, string, error) {
 	num := ""
 	for i := 0; i < 6; i++ {
