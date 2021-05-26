@@ -20,7 +20,7 @@ jobs:
         name: Build Web
         run: |
           npm install yarn -g
-          yarn global add @quasar/cli
+          npm install -g @quasar/cli
           cd Web
           quasar build
       -
