@@ -18,13 +18,11 @@ jobs:
         with:
           node-version: 12
           registry-url: https://registry.npmjs.org
-      - name: setup-quasar
-        uses: joshstrange/setup-quasar@v1
-        with:
-          cordova-version: 9
       -
         name: Build Web
         run: |
+          npm install yarn -g
+          yarn global add @quasar/cli
           cd Web
           quasar build
       -
