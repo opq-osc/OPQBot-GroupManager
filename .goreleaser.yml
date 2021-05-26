@@ -31,8 +31,6 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 project_name: opqbot-manager
-snapshot:
-  name_template: "{{ .Tag }}-next"
 changelog:
   sort: asc
   filters:
