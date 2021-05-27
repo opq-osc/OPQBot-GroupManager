@@ -22,6 +22,7 @@ defaultgroupconfig:
     joinverifytime: 0
     joinautoshutuptime: 0
     zan: false
+    bili: true
     signin: true
     welcome: ""
     joinverifytype: 0

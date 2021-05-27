@@ -11,9 +11,107 @@ import (
 )
 
 type Manager struct {
-	ups        map[int64]Up
-	upsMapLock *sync.RWMutex
-	r          *requests.Request
+	ups          map[int64]Up
+	fanjus       map[int64]Fanju
+	upsMapLock   *sync.RWMutex
+	fanjuMapLock *sync.RWMutex
+	r            *requests.Request
+}
+type SearchFanjuResult struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	TTL     int    `json:"ttl"`
+	Data    struct {
+		Seid           string `json:"seid"`
+		Page           int    `json:"page"`
+		Pagesize       int    `json:"pagesize"`
+		Numresults     int    `json:"numResults"`
+		Numpages       int    `json:"numPages"`
+		SuggestKeyword string `json:"suggest_keyword"`
+		RqtType        string `json:"rqt_type"`
+		CostTime       struct {
+			ParamsCheck         string `json:"params_check"`
+			IllegalHandler      string `json:"illegal_handler"`
+			AsResponseFormat    string `json:"as_response_format"`
+			AsRequest           string `json:"as_request"`
+			SaveCache           string `json:"save_cache"`
+			DeserializeResponse string `json:"deserialize_response"`
+			AsRequestFormat     string `json:"as_request_format"`
+			Total               string `json:"total"`
+			MainHandler         string `json:"main_handler"`
+		} `json:"cost_time"`
+		ExpList struct {
+			Num5502 bool `json:"5502"`
+			Num6600 bool `json:"6600"`
+		} `json:"exp_list"`
+		EggHit int `json:"egg_hit"`
+		Result []struct {
+			Type           string   `json:"type"`
+			MediaID        int64    `json:"media_id"`
+			Title          string   `json:"title"`
+			OrgTitle       string   `json:"org_title"`
+			MediaType      int      `json:"media_type"`
+			Cv             string   `json:"cv"`
+			Staff          string   `json:"staff"`
+			SeasonID       int      `json:"season_id"`
+			IsAvid         bool     `json:"is_avid"`
+			HitColumns     []string `json:"hit_columns"`
+			HitEpids       string   `json:"hit_epids"`
+			SeasonType     int      `json:"season_type"`
+			SeasonTypeName string   `json:"season_type_name"`
+			SelectionStyle string   `json:"selection_style"`
+			EpSize         int      `json:"ep_size"`
+			URL            string   `json:"url"`
+			ButtonText     string   `json:"button_text"`
+			IsFollow       int      `json:"is_follow"`
+			IsSelection    int      `json:"is_selection"`
+			Eps            []struct {
+				ID          int         `json:"id"`
+				Cover       string      `json:"cover"`
+				Title       string      `json:"title"`
+				URL         string      `json:"url"`
+				ReleaseDate string      `json:"release_date"`
+				Badges      interface{} `json:"badges"`
+				IndexTitle  string      `json:"index_title"`
+				LongTitle   string      `json:"long_title"`
+			} `json:"eps"`
+			Badges []struct {
+				Text             string `json:"text"`
+				TextColor        string `json:"text_color"`
+				TextColorNight   string `json:"text_color_night"`
+				BgColor          string `json:"bg_color"`
+				BgColorNight     string `json:"bg_color_night"`
+				BorderColor      string `json:"border_color"`
+				BorderColorNight string `json:"border_color_night"`
+				BgStyle          int    `json:"bg_style"`
+			} `json:"badges"`
+			Cover         string `json:"cover"`
+			Areas         string `json:"areas"`
+			Styles        string `json:"styles"`
+			GotoURL       string `json:"goto_url"`
+			Desc          string `json:"desc"`
+			Pubtime       int    `json:"pubtime"`
+			MediaMode     int    `json:"media_mode"`
+			FixPubtimeStr string `json:"fix_pubtime_str"`
+			MediaScore    struct {
+				Score     float64 `json:"score"`
+				UserCount int     `json:"user_count"`
+			} `json:"media_score"`
+			DisplayInfo []struct {
+				Text             string `json:"text"`
+				TextColor        string `json:"text_color"`
+				TextColorNight   string `json:"text_color_night"`
+				BgColor          string `json:"bg_color"`
+				BgColorNight     string `json:"bg_color_night"`
+				BorderColor      string `json:"border_color"`
+				BorderColorNight string `json:"border_color_night"`
+				BgStyle          int    `json:"bg_style"`
+			} `json:"display_info"`
+			PgcSeasonID int `json:"pgc_season_id"`
+			Corner      int `json:"corner"`
+		} `json:"result"`
+		ShowColumn int `json:"show_column"`
+	} `json:"data"`
 }
 type SearchResult struct {
 	Code    int    `json:"code"`
@@ -88,10 +186,10 @@ type Up struct {
 	Created int64
 	Groups  []int64
 }
-
-type GroupNode struct {
-	GroupId int64
-	Next    *GroupNode
+type Fanju struct {
+	Title  string
+	Id     int64
+	Groups []int64
 }
 
 type BiliResult struct {
@@ -109,7 +207,33 @@ type BiliResult struct {
 		} `json:"page"`
 	} `json:"data"`
 }
-
+type BiliFanjuResult struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Result  struct {
+		Media struct {
+			Areas []struct {
+				ID   int    `json:"id"`
+				Name string `json:"name"`
+			} `json:"areas"`
+			Cover   string `json:"cover"`
+			MediaID int64  `json:"media_id"`
+			NewEp   struct {
+				ID        int64  `json:"id"`
+				Index     string `json:"index"`
+				IndexShow string `json:"index_show"`
+			} `json:"new_ep"`
+			Rating struct {
+				Count int     `json:"count"`
+				Score float64 `json:"score"`
+			} `json:"rating"`
+			SeasonID int    `json:"season_id"`
+			ShareURL string `json:"share_url"`
+			Title    string `json:"title"`
+			TypeName string `json:"type_name"`
+		} `json:"media"`
+	} `json:"result"`
+}
 type Video struct {
 	Comment        int    `json:"comment"`
 	Typeid         int    `json:"typeid"`
@@ -226,6 +350,7 @@ func NewManager() (m Manager) {
 	Config.Lock.RLock()
 	defer Config.Lock.RUnlock()
 	m.ups = make(map[int64]Up)
+	m.fanjus = make(map[int64]Fanju)
 	for groupId, v := range Config.CoreConfig.GroupConfig {
 		for mid, v1 := range v.BiliUps {
 			if up, ok := m.ups[mid]; ok {
@@ -238,8 +363,20 @@ func NewManager() (m Manager) {
 				}
 			}
 		}
+		for mid, v1 := range v.Fanjus {
+			if up, ok := m.fanjus[mid]; ok {
+				up.Groups = append(up.Groups, groupId)
+			} else {
+				m.fanjus[mid] = Fanju{
+					Title:  v1.Title,
+					Id:     v1.Id,
+					Groups: []int64{groupId},
+				}
+			}
+		}
 	}
 
+	m.fanjuMapLock = &sync.RWMutex{}
 	m.upsMapLock = &sync.RWMutex{}
 	m.r = requests.Requests()
 	m.r.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36 Edg/90.0.818.66")
@@ -252,9 +389,11 @@ func (m *Manager) GetAllSubscribeUp() map[int64]Up {
 	return m.ups
 }
 
-func (m *Manager) ScanUpdate() (result []Video) {
+func (m *Manager) ScanUpdate() (upResult []Video, fanjuResult []BiliFanjuResult) {
 	m.upsMapLock.Lock()
 	defer m.upsMapLock.Unlock()
+	m.fanjuMapLock.Lock()
+	defer m.fanjuMapLock.Unlock()
 	Config.Lock.Lock()
 	defer Config.Lock.Unlock()
 	for mid, v := range m.ups {
@@ -273,7 +412,7 @@ func (m *Manager) ScanUpdate() (result []Video) {
 			if len(biliResult.Data.List.Vlist) != 0 && biliResult.Data.List.Vlist[0].Created > v.Created {
 				// 检测到更新
 				if v.Created != 0 { // 跳过订阅后首次扫描
-					result = append(result, biliResult.Data.List.Vlist[0])
+					upResult = append(upResult, biliResult.Data.List.Vlist[0])
 				}
 				v.Created = biliResult.Data.List.Vlist[0].Created
 				m.ups[mid] = v
@@ -292,9 +431,49 @@ func (m *Manager) ScanUpdate() (result []Video) {
 			}
 		}
 	}
+	for mid, v := range m.fanjus {
+		faju, err := m.GetFanjuByMid(mid)
+		if err != nil {
+			log.Println(err)
+			break
+		}
+		if faju.Code == 0 {
+			if faju.Result.Media.NewEp.ID > v.Id {
+				// 检测到更新
+				if v.Id != 0 { // 跳过订阅后首次扫描
+					fanjuResult = append(fanjuResult, faju)
+				}
+				v.Id = faju.Result.Media.NewEp.ID
+				m.fanjus[mid] = v
+
+				for _, v1 := range v.Groups {
+					if v2, ok := Config.CoreConfig.GroupConfig[v1]; ok {
+						if v3, ok := v2.Fanjus[mid]; ok {
+							v3.Id = v.Id
+							v2.Fanjus[mid] = v3
+						}
+						Config.CoreConfig.GroupConfig[v1] = v2
+					}
+				}
+				Config.Save()
+
+			}
+		}
+	}
 	return
 }
 
+func (m *Manager) GetFanjuByMid(mid int64) (u BiliFanjuResult, e error) {
+	res, e := m.r.Get(fmt.Sprintf("https://api.bilibili.com/pgc/review/user?media_id=%d", mid))
+	if e != nil {
+		return
+	}
+	e = res.Json(&u)
+	if e != nil {
+		return
+	}
+	return
+}
 func (m *Manager) GetUpInfoByMid(mid int64) (u UpInfoResult, e error) {
 	res, e := m.r.Get(fmt.Sprintf("https://api.bilibili.com/x/web-interface/card?mid=%d", mid))
 	if e != nil {
@@ -337,6 +516,37 @@ func (m *Manager) UnSubscribeUp(groupId int64, mid int64) (e error) {
 	}
 
 }
+func (m *Manager) UnSubscribeFanju(groupId int64, mid int64) (e error) {
+	m.fanjuMapLock.Lock()
+	defer m.fanjuMapLock.Unlock()
+	Config.Lock.Lock()
+	defer Config.Lock.Unlock()
+	if fj, ok := m.fanjus[mid]; ok {
+		for i, v := range fj.Groups {
+			if v == groupId {
+				if len(fj.Groups) == 1 {
+					delete(m.fanjus, mid)
+				} else {
+					fj.Groups = append(fj.Groups[:i], fj.Groups[i+1:]...)
+					m.fanjus[mid] = fj
+				}
+
+				if v2, ok := Config.CoreConfig.GroupConfig[groupId]; ok {
+					delete(v2.Fanjus, mid)
+					Config.CoreConfig.GroupConfig[groupId] = v2
+				}
+				Config.Save()
+
+				return nil
+			}
+		}
+
+		return nil
+	} else {
+		return nil
+	}
+
+}
 func (m *Manager) SubscribeUpByKeyword(groupId int64, keyword string) (u UpInfoResult, e error) {
 	if groupId == 0 {
 		e = errors.New("默认群禁止订阅!")
@@ -346,76 +556,19 @@ func (m *Manager) SubscribeUpByKeyword(groupId int64, keyword string) (u UpInfoR
 	if e != nil {
 		return
 	}
-	m.upsMapLock.Lock()
-	defer m.upsMapLock.Unlock()
-	Config.Lock.Lock()
-	defer Config.Lock.Unlock()
-
-	if up, ok := m.ups[mid]; ok {
-		in := false
-		for _, v := range up.Groups {
-			if v == groupId {
-				in = true
-				break
-			}
-		}
-		if in {
-			e = errors.New("该群已经订阅了该UP")
-			return
-		}
-	}
-
-	if u, e = m.GetUpInfoByMid(mid); e != nil {
+	u, e = m.SubscribeUpByMid(groupId, mid)
+	return
+}
+func (m *Manager) SubscribeFanjuByKeyword(groupId int64, keyword string) (u BiliFanjuResult, e error) {
+	if groupId == 0 {
+		e = errors.New("默认群禁止订阅!")
 		return
-	} else {
-		if u.Code != 0 {
-			if u.Code == -404 {
-				e = errors.New("找不到该UP")
-				return
-			}
-			e = errors.New("Code Err")
-			return
-		}
-
-		if up, c := m.ups[mid]; c {
-			up.Groups = append(up.Groups, groupId)
-			m.ups[mid] = up
-			if v, ok := Config.CoreConfig.GroupConfig[groupId]; ok {
-				if v.BiliUps == nil {
-					v.BiliUps = map[int64]Config.Up{}
-				}
-				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: up.Created}
-				Config.CoreConfig.GroupConfig[groupId] = v
-			} else {
-				if v.BiliUps == nil {
-					v.BiliUps = map[int64]Config.Up{}
-				}
-				v = Config.CoreConfig.DefaultGroupConfig
-				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: up.Created}
-				Config.CoreConfig.GroupConfig[groupId] = v
-			}
-			Config.Save()
-		} else {
-			up = Up{Name: u.Data.Card.Name, Groups: []int64{groupId}, Created: 0}
-			m.ups[mid] = up
-			if v, ok := Config.CoreConfig.GroupConfig[groupId]; ok {
-				if v.BiliUps == nil {
-					v.BiliUps = map[int64]Config.Up{}
-				}
-				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: 0}
-				Config.CoreConfig.GroupConfig[groupId] = v
-			} else {
-				if v.BiliUps == nil {
-					v.BiliUps = map[int64]Config.Up{}
-				}
-				v = Config.CoreConfig.DefaultGroupConfig
-				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: 0}
-				Config.CoreConfig.GroupConfig[groupId] = v
-			}
-			Config.Save()
-		}
-
 	}
+	mediaId, e := m.SearchFanju(keyword)
+	if e != nil {
+		return
+	}
+	u, e = m.SubscribeFanjuByMid(groupId, mediaId)
 	return
 }
 func (m *Manager) SubscribeUpByMid(groupId int64, mid int64) (u UpInfoResult, e error) {
@@ -494,7 +647,94 @@ func (m *Manager) SubscribeUpByMid(groupId int64, mid int64) (u UpInfoResult, e 
 	}
 	return
 }
+func (m *Manager) SubscribeFanjuByMid(groupId int64, mediaId int64) (u BiliFanjuResult, e error) {
+	if groupId == 0 {
+		e = errors.New("默认群禁止订阅!")
+		return
+	}
+	m.fanjuMapLock.Lock()
+	defer m.fanjuMapLock.Unlock()
+	Config.Lock.Lock()
+	defer Config.Lock.Unlock()
+	if fj, ok := m.fanjus[mediaId]; ok {
+		in := false
+		for _, v := range fj.Groups {
+			if v == groupId {
+				in = true
+				break
+			}
+		}
+		if in {
+			e = errors.New("该群已经订阅了该番剧")
+			return
+		}
+	}
 
+	if u, e = m.GetFanjuByMid(mediaId); e != nil {
+		return
+	} else {
+		if u.Code != 0 {
+			if u.Code == -404 {
+				e = errors.New("找不到该番剧")
+				return
+			}
+			e = errors.New("Code Err")
+			return
+		}
+
+		if fj, c := m.fanjus[mediaId]; c {
+			fj.Groups = append(fj.Groups, groupId)
+			m.fanjus[mediaId] = fj
+			if v, ok := Config.CoreConfig.GroupConfig[groupId]; ok {
+				if v.Fanjus == nil {
+					v.Fanjus = map[int64]Config.Fanju{}
+				}
+				v.Fanjus[mediaId] = Config.Fanju{
+					Title: u.Result.Media.Title,
+					Id:    fj.Id,
+				}
+				Config.CoreConfig.GroupConfig[groupId] = v
+			} else {
+				if v.Fanjus == nil {
+					v.Fanjus = map[int64]Config.Fanju{}
+				}
+				v = Config.CoreConfig.DefaultGroupConfig
+				v.Fanjus[mediaId] = Config.Fanju{
+					Title: u.Result.Media.Title,
+					Id:    fj.Id,
+				}
+				Config.CoreConfig.GroupConfig[groupId] = v
+			}
+			Config.Save()
+		} else {
+			fj = Fanju{Title: u.Result.Media.Title, Groups: []int64{groupId}, Id: 0}
+			m.fanjus[mediaId] = fj
+			if v, ok := Config.CoreConfig.GroupConfig[groupId]; ok {
+				if v.Fanjus == nil {
+					v.Fanjus = map[int64]Config.Fanju{}
+				}
+				v.Fanjus[mediaId] = Config.Fanju{
+					Title: u.Result.Media.Title,
+					Id:    0,
+				}
+				Config.CoreConfig.GroupConfig[groupId] = v
+			} else {
+				if v.Fanjus == nil {
+					v.Fanjus = map[int64]Config.Fanju{}
+				}
+				v = Config.CoreConfig.DefaultGroupConfig
+				v.Fanjus[mediaId] = Config.Fanju{
+					Title: u.Result.Media.Title,
+					Id:    0,
+				}
+				Config.CoreConfig.GroupConfig[groupId] = v
+			}
+			Config.Save()
+		}
+	}
+
+	return
+}
 func (m *Manager) SearchUp(keyword string) (mid int64, err error) {
 	res, err := m.r.Get("https://api.bilibili.com/x/web-interface/search/type?context=&search_type=bili_user&page=1&order=&category_id=&user_type=&order_sort=&changing=mid&__refresh__=true&_extra=&highlight=1&single_column=0&keyword=" + keyword)
 	if err != nil {
@@ -517,10 +757,41 @@ func (m *Manager) SearchUp(keyword string) (mid int64, err error) {
 	}
 	return
 }
-func (m *Manager) GetGroupsByMid(mid int64) (upName string, g []int64) {
+func (m *Manager) SearchFanju(keyword string) (mid int64, err error) {
+	res, err := m.r.Get("https://api.bilibili.com/x/web-interface/search/type?context=&search_type=media_bangumi&page=1&order=&category_id=&__refresh__=true&_extra=&highlight=1&single_column=0&keyword=" + keyword)
+	if err != nil {
+		return
+	}
+	var result SearchFanjuResult
+	err = res.Json(&result)
+	if err != nil {
+		return
+	}
+	mid = 0
+	if len(result.Data.Result) > 0 {
+		mid = result.Data.Result[0].MediaID
+	}
+
+	if mid == 0 {
+		err = errors.New("没有找到番剧")
+	}
+	return
+}
+func (m *Manager) GetUpGroupsByMid(mid int64) (upName string, g []int64) {
+	m.upsMapLock.RLock()
+	defer m.upsMapLock.RUnlock()
 	if v, ok := m.ups[mid]; ok {
 		g = v.Groups
 		upName = v.Name
+	}
+	return
+}
+func (m *Manager) GetFanjuGroupsByMid(mid int64) (title string, g []int64) {
+	m.fanjuMapLock.RLock()
+	defer m.fanjuMapLock.RUnlock()
+	if v, ok := m.fanjus[mid]; ok {
+		g = v.Groups
+		title = v.Title
 	}
 	return
 }

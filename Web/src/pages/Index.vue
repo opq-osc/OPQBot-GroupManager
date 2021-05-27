@@ -292,6 +292,10 @@
       label="名片赞功能"
       v-model="selectGroupConfig.Zan"
     />
+    <q-toggle
+      label="Bilibili订阅姬"
+      v-model="selectGroupConfig.Bili"
+    />
  </div>
    <q-btn outline @click="setGroupConfig(selectGroup.GroupId, selectGroupConfig)" class="q-mt-md">保存</q-btn>
     <q-btn outline class="q-mt-md q-ml-sm">导出签到数据</q-btn>
