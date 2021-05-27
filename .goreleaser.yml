@@ -14,6 +14,9 @@ builds:
       - windows
       - darwin
       - android
+    ignore:
+      - goos: android
+        goarch: 386
 archives:
   -
     name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
