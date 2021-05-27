@@ -57,7 +57,7 @@ func main() {
 	c := NewBotCronManager()
 	c.Start()
 	bi := bili.NewManager()
-	c.AddJob(-1, "Bili", "*/1 * * * *", func() {
+	c.AddJob(-1, "Bili", "*/5 * * * *", func() {
 		update := bi.ScanUpdate()
 		for _, v := range update {
 			upName, gs := bi.GetGroupsByMid(v.Mid)
