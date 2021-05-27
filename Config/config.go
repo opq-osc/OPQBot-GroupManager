@@ -53,9 +53,15 @@ type GroupConfig struct {
 	JoinAutoShutUpTime int
 	Zan                bool
 	SignIn             bool
+	Bili               bool
+	BiliUps            map[int64]Up
 	Welcome            string
 	JoinVerifyType     int
 	Job                map[string]Job
+}
+type Up struct {
+	Name    string
+	Created int64
 }
 
 var (

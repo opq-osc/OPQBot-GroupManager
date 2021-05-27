@@ -1,11 +1,14 @@
 package main
 
 import (
+	bili "OPQBot-QQGroupManager/Bili"
 	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/methods"
 	"embed"
 	"encoding/base64"
+	"fmt"
+	"github.com/mcoo/requests"
 	"io/fs"
 	"log"
 	"math/rand"
@@ -53,19 +56,32 @@ func main() {
 	VerifyLock := sync.Mutex{}
 	c := NewBotCronManager()
 	c.Start()
+	bi := bili.NewManager()
+	c.AddJob(-1, "Bili", "*/1 * * * *", func() {
+		update := bi.ScanUpdate()
+		for _, v := range update {
+			upName, gs := bi.GetGroupsByMid(v.Mid)
+			for _, g := range gs {
+				res, _ := requests.Get(v.Pic)
+				b.SendGroupPicMsg(g, fmt.Sprintf("UP主%s更新了\n%s\n%s", upName, v.Title, v.Description), res.Content())
+			}
+		}
+	})
+
 	// 黑名单优先级高于白名单
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, BlackGroupList, WhiteGroupList, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
 			return
 		}
 		Config.Lock.RLock()
-		defer Config.Lock.RUnlock()
+
 		var c Config.GroupConfig
 		if v, ok := Config.CoreConfig.GroupConfig[packet.FromGroupID]; ok {
 			c = v
 		} else {
 			c = Config.CoreConfig.DefaultGroupConfig
 		}
+		Config.Lock.RUnlock()
 		if !c.Enable {
 			return
 		}
@@ -135,6 +151,7 @@ func main() {
 			return
 		}
 		if packet.Content == "签到" {
+
 			if !c.SignIn {
 				b.Send(OPQBot.SendMsgPack{
 					SendToType:   OPQBot.SendToTypeGroup,
@@ -144,6 +161,7 @@ func main() {
 				})
 				return
 			}
+			Config.Lock.Lock()
 			if v, ok := Config.CoreConfig.UserData[packet.FromUserID]; ok {
 				if v.LastSignDay == time.Now().Day() {
 					b.Send(OPQBot.SendMsgPack{
@@ -182,6 +200,7 @@ func main() {
 					CallbackFunc: nil,
 				})
 			}
+			Config.Lock.Unlock()
 		}
 		if packet.Content == "赞我" {
 			if !c.Zan {
@@ -193,6 +212,7 @@ func main() {
 				})
 				return
 			}
+			Config.Lock.Lock()
 			if v, ok := Config.CoreConfig.UserData[packet.FromUserID]; ok {
 				if v.LastZanDay == time.Now().Day() {
 					b.Send(OPQBot.SendMsgPack{
@@ -229,8 +249,10 @@ func main() {
 					CallbackFunc: nil,
 				})
 			}
+			Config.Lock.Unlock()
 		}
 		if packet.Content == "积分" {
+			Config.Lock.RLock()
 			if v, ok := Config.CoreConfig.UserData[packet.FromUserID]; ok {
 				b.Send(OPQBot.SendMsgPack{
 					SendToType:   OPQBot.SendToTypeGroup,
@@ -246,6 +268,61 @@ func main() {
 					CallbackFunc: nil,
 				})
 			}
+			Config.Lock.RUnlock()
+		}
+		cm := strings.Split(packet.Content, " ")
+		if len(cm) == 2 && cm[0] == "订阅up" {
+			mid, err := strconv.ParseInt(cm[1], 10, 64)
+			if err != nil {
+				u, err := bi.SubscribeUpByKeyword(packet.FromGroupID, cm[1])
+				if err != nil {
+					b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+					return
+				}
+				r, _ := requests.Get(u.Data.Card.Face)
+				b.SendGroupPicMsg(packet.FromGroupID, fmt.Sprintf("成功订阅UP主%s<%s>", u.Data.Card.Name, u.Data.Card.Mid), r.Content())
+				return
+			}
+			u, err := bi.SubscribeUpByMid(packet.FromGroupID, mid)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			r, _ := requests.Get(u.Data.Card.Face)
+			b.SendGroupPicMsg(packet.FromGroupID, "成功订阅UP主"+u.Data.Card.Name, r.Content())
+		}
+		if len(cm) == 2 && cm[0] == "取消订阅up" {
+			mid, err := strconv.ParseInt(cm[1], 10, 64)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			err = bi.UnSubscribeUp(packet.FromGroupID, mid)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, "成功取消订阅UP主")
+		}
+		if packet.Content == "本群up" {
+			Config.Lock.RLock()
+			ups := "本群订阅UPs\n"
+			if v, ok := Config.CoreConfig.GroupConfig[packet.FromGroupID]; ok {
+				if len(v.BiliUps) == 0 {
+					b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅UP主")
+					return
+				}
+				for mid, v1 := range v.BiliUps {
+					ups += fmt.Sprintf("%d - %s\n", mid, v1.Name)
+				}
+				b.SendGroupTextMsg(packet.FromGroupID, ups)
+
+			} else {
+				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅UP主")
+				return
+			}
+
+			Config.Lock.RUnlock()
 		}
 	})
 	if err != nil {
