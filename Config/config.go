@@ -55,6 +55,7 @@ type GroupConfig struct {
 	SignIn             bool
 	Bili               bool
 	BiliUps            map[int64]Up
+	Fanjus             map[int64]Fanju
 	Welcome            string
 	JoinVerifyType     int
 	Job                map[string]Job
@@ -62,6 +63,10 @@ type GroupConfig struct {
 type Up struct {
 	Name    string
 	Created int64
+}
+type Fanju struct {
+	Title string
+	Id    int64
 }
 
 var (

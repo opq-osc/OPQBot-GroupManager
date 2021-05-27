@@ -60,20 +60,32 @@ func main() {
 	c.Start()
 	bi := bili.NewManager()
 	c.AddJob(-1, "Bili", "*/5 * * * *", func() {
-		update := bi.ScanUpdate()
+		Config.Lock.RLock()
+		defer Config.Lock.RUnlock()
+		update, fanju := bi.ScanUpdate()
 		for _, v := range update {
-			upName, gs := bi.GetGroupsByMid(v.Mid)
-			Config.Lock.RLock()
+			upName, gs := bi.GetUpGroupsByMid(v.Mid)
 			for _, g := range gs {
-				if v, ok := Config.CoreConfig.GroupConfig[g]; ok {
-					if !v.Bili {
+				if v1, ok := Config.CoreConfig.GroupConfig[g]; ok {
+					if !v1.Bili {
 						break
 					}
 				}
 				res, _ := requests.Get(v.Pic)
 				b.SendGroupPicMsg(g, fmt.Sprintf("UP主%s更新了\n%s\n%s", upName, v.Title, v.Description), res.Content())
 			}
-			Config.Lock.RUnlock()
+		}
+		for _, v := range fanju {
+			title, gs := bi.GetFanjuGroupsByMid(v.Result.Media.MediaID)
+			for _, g := range gs {
+				if v1, ok := Config.CoreConfig.GroupConfig[g]; ok {
+					if !v1.Bili {
+						break
+					}
+				}
+				res, _ := requests.Get(v.Result.Media.Cover)
+				b.SendGroupPicMsg(g, fmt.Sprintf("番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow), res.Content())
+			}
 		}
 	})
 
@@ -331,6 +343,61 @@ func main() {
 			}
 			for mid, v1 := range c.BiliUps {
 				ups += fmt.Sprintf("%d - %s\n", mid, v1.Name)
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, ups)
+
+		}
+		if len(cm) == 2 && cm[0] == "订阅番剧" {
+			if !c.Bili {
+				return
+			}
+			mid, err := strconv.ParseInt(cm[1], 10, 64)
+			if err != nil {
+				u, err := bi.SubscribeFanjuByKeyword(packet.FromGroupID, cm[1])
+				if err != nil {
+					b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+					return
+				}
+				r, _ := requests.Get(u.Result.Media.Cover)
+				b.SendGroupPicMsg(packet.FromGroupID, "成功订阅番剧"+u.Result.Media.Title, r.Content())
+				return
+			}
+			u, err := bi.SubscribeFanjuByMid(packet.FromGroupID, mid)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			r, _ := requests.Get(u.Result.Media.Cover)
+			b.SendGroupPicMsg(packet.FromGroupID, "成功订阅番剧"+u.Result.Media.Title, r.Content())
+		}
+		if len(cm) == 2 && cm[0] == "取消订阅番剧" {
+			if !c.Bili {
+				return
+			}
+			mid, err := strconv.ParseInt(cm[1], 10, 64)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, "只能使用Mid取消订阅欧~")
+				return
+			}
+			err = bi.UnSubscribeFanju(packet.FromGroupID, mid)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, "成功取消订阅番剧")
+		}
+		if packet.Content == "本群番剧" {
+			if !c.Bili {
+				return
+			}
+			ups := "本群订阅番剧\n"
+
+			if len(c.BiliUps) == 0 {
+				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅番剧")
+				return
+			}
+			for mid, v1 := range c.Fanjus {
+				ups += fmt.Sprintf("%d - %s\n", mid, v1.Title)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
 
