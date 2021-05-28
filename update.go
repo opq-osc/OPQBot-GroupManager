@@ -93,8 +93,8 @@ func CheckUpdate() {
 		log.Println(err)
 		return
 	}
-	if result.TagName != version {
-		log.Println("检测到更新欧~ " + result.TagName)
+	if !strings.HasSuffix(result.TagName, version) {
+		log.Println("检测到更新欧~ Ver " + result.TagName)
 		downloadName := "opqbot-manager_" + runtime.GOOS + "_" + strings.ReplaceAll(strings.ReplaceAll(runtime.GOARCH, "386", "i386"), "amd64", "x86_64")
 		for _, v := range result.Assets {
 			if strings.HasPrefix(strings.ToLower(v.Name), downloadName) {
