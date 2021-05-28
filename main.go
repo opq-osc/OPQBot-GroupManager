@@ -44,6 +44,7 @@ var staticFs embed.FS
 func main() {
 	log.Println("QQ Group Manager✈️" + version)
 	androidDns.SetDns()
+	go CheckUpdate()
 	b := OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)
 	err := b.AddEvent(OPQBot.EventNameOnDisconnected, func() {
 		log.Println("断开服务器")
@@ -60,8 +61,6 @@ func main() {
 	c.Start()
 	bi := bili.NewManager()
 	c.AddJob(-1, "Bili", "*/5 * * * *", func() {
-		Config.Lock.RLock()
-		defer Config.Lock.RUnlock()
 		update, fanju := bi.ScanUpdate()
 		for _, v := range update {
 			upName, gs := bi.GetUpGroupsByMid(v.Mid)
@@ -408,13 +407,13 @@ func main() {
 	}
 	err = b.AddEvent(OPQBot.EventNameOnGroupJoin, func(botQQ int64, packet *OPQBot.GroupJoinPack) {
 		Config.Lock.RLock()
-		defer Config.Lock.RUnlock()
 		var c Config.GroupConfig
 		if v, ok := Config.CoreConfig.GroupConfig[packet.EventMsg.FromUin]; ok {
 			c = v
 		} else {
 			c = Config.CoreConfig.DefaultGroupConfig
 		}
+		Config.Lock.RUnlock()
 		if !c.Enable {
 			return
 		}
