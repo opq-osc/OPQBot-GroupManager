@@ -391,7 +391,7 @@ func main() {
 			}
 			ups := "本群订阅番剧\n"
 
-			if len(c.BiliUps) == 0 {
+			if len(c.Fanjus) == 0 {
 				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅番剧")
 				return
 			}
