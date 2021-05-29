@@ -94,7 +94,10 @@ func CheckUpdate() {
 		return
 	}
 	if !strings.HasSuffix(result.TagName, version) {
-		log.Println("检测到更新欧~ Ver " + result.TagName)
+		log.Println("检测到更新欧~ " + result.TagName)
+		if result.Prerelease {
+			log.Println("注意最新版本为预发行版本")
+		}
 		downloadName := "opqbot-manager_" + runtime.GOOS + "_" + strings.ReplaceAll(strings.ReplaceAll(runtime.GOARCH, "386", "i386"), "amd64", "x86_64")
 		for _, v := range result.Assets {
 			if strings.HasPrefix(strings.ToLower(v.Name), downloadName) {

@@ -32,6 +32,9 @@ archives:
     files:
       - config.yaml.example
       - LICENSE
+      - README.md
+release:
+  prerelease: auto
 checksum:
   name_template: 'checksums.txt'
 project_name: opqbot-manager
