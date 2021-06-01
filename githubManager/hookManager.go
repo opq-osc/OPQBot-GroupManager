@@ -114,12 +114,20 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 				commitString = append(commitString, fmt.Sprintf("[%s] %s", v1.Timestamp, v1.Message))
 			}
 			r, _ := requests.Get(v.Sender.AvatarURL)
-			m.b.SendGroupPicMsg(h.Groups[0], fmt.Sprintf("%s\nCommit:\n%s", v.Repository.FullName, strings.Join(commitString, "\n")), r.Content())
+			for _, v1 := range h.Groups {
+				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\nCommit:\n%s", v.Repository.FullName, strings.Join(commitString, "\n")), r.Content())
+			}
 		case github.ReleasePayload:
 			r, _ := requests.Get(v.Sender.AvatarURL)
-			m.b.SendGroupPicMsg(h.Groups[0], fmt.Sprintf("%s\n发布了:\n%s", v.Repository.FullName, v.Release.TagName), r.Content())
+			for _, v1 := range h.Groups {
+				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\n发布了:\n%s", v.Repository.FullName, v.Release.TagName), r.Content())
+
+			}
 		case github.PullRequestPayload:
-			m.b.SendGroupTextMsg(h.Groups[0], fmt.Sprintf("%s\nPR: %s", v.Repository.FullName, v.PullRequest.Body))
+			for _, v1 := range h.Groups {
+				m.b.SendGroupTextMsg(v1, fmt.Sprintf("%s\nPR: %s", v.Repository.FullName, v.PullRequest.Body))
+			}
+
 		}
 	})
 	return m
