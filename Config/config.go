@@ -70,10 +70,12 @@ type GroupConfig struct {
 type Up struct {
 	Name    string
 	Created int64
+	UserId int64
 }
 type Fanju struct {
 	Title string
 	Id    int64
+	UserId int64
 }
 
 var (
