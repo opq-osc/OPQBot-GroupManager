@@ -13,7 +13,7 @@ OPQBot 群管理机器人
 ## Github订阅
 ### 说明
 需要在GitHub仓库中设置好 webhook的地址 例如 `http://*****/github/webhook/opq-osc/OPQBot-GroupManager`
-后面`opq-osc/OPQBot-GroupManager`是仓库地址
+后面`opq-osc/OPQBot-GroupManager`是仓库地址，而secret是需要私聊QQ机器人输入的东西
 ### 命令
 - 本群Github
 - 取消订阅Github {仓库名称}

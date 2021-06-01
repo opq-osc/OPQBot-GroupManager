@@ -68,7 +68,7 @@ func main() {
 	c.AddJob(-1, "Bili", "*/5 * * * *", func() {
 		update, fanju := bi.ScanUpdate()
 		for _, v := range update {
-			upName, gs := bi.GetUpGroupsByMid(v.Mid)
+			upName, gs, userId := bi.GetUpGroupsByMid(v.Mid)
 			for _, g := range gs {
 				if v1, ok := Config.CoreConfig.GroupConfig[g]; ok {
 					if !v1.Bili {
@@ -76,11 +76,32 @@ func main() {
 					}
 				}
 				res, _ := requests.Get(v.Pic)
-				b.SendGroupPicMsg(g, fmt.Sprintf("UP主%s更新了\n%s\n%s", upName, v.Title, v.Description), res.Content())
+				if userId != 0 {
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypeGroup,
+						ToUserUid:  g,
+						Content: OPQBot.SendTypePicMsgByBase64Content{
+							Content: OPQBot.MacroAt([]int64{userId}) + fmt.Sprintf("您订阅的UP主%s更新了\n%s\n%s", upName, v.Title, v.Description),
+							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
+							Flash:   false,
+						},
+					})
+				} else {
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypeGroup,
+						ToUserUid:  g,
+						Content: OPQBot.SendTypePicMsgByBase64Content{
+							Content: fmt.Sprintf("不知道是谁订阅的UP主%s更新了\n%s\n%s", upName, v.Title, v.Description),
+							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
+							Flash:   false,
+						},
+					})
+				}
+
 			}
 		}
 		for _, v := range fanju {
-			title, gs := bi.GetFanjuGroupsByMid(v.Result.Media.MediaID)
+			title, gs, userId := bi.GetFanjuGroupsByMid(v.Result.Media.MediaID)
 			for _, g := range gs {
 				if v1, ok := Config.CoreConfig.GroupConfig[g]; ok {
 					if !v1.Bili {
@@ -88,7 +109,15 @@ func main() {
 					}
 				}
 				res, _ := requests.Get(v.Result.Media.Cover)
-				b.SendGroupPicMsg(g, fmt.Sprintf("番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow), res.Content())
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypeGroup,
+					ToUserUid:  g,
+					Content: OPQBot.SendTypePicMsgByBase64Content{
+						Content: OPQBot.MacroAt([]int64{userId}) + fmt.Sprintf("您订阅的番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow),
+						Base64:  base64.StdEncoding.EncodeToString(res.Content()),
+						Flash:   false,
+					},
+				})
 			}
 		}
 	})
@@ -340,7 +369,7 @@ func main() {
 			}
 			if v1, ok := v.(map[int]int64); ok {
 				if v2, ok := v1[id]; ok {
-					u, err := bi.SubscribeUpByMid(packet.FromGroupID, v2)
+					u, err := bi.SubscribeUpByMid(packet.FromGroupID, v2, packet.FromUserID)
 					if err != nil {
 						b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 						err = s.Delete("biliUps")
@@ -445,7 +474,7 @@ func main() {
 				b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf("====输入序号选择UP====\n%s", strings.Join(resultStr, "\n")))
 				return
 			}
-			u, err := bi.SubscribeUpByMid(packet.FromGroupID, mid)
+			u, err := bi.SubscribeUpByMid(packet.FromGroupID, mid, packet.FromUserID)
 			if err != nil {
 				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 				return
@@ -480,7 +509,7 @@ func main() {
 				return
 			}
 			for mid, v1 := range c.BiliUps {
-				ups += fmt.Sprintf("%d - %s\n", mid, v1.Name)
+				ups += fmt.Sprintf("%d - %s - 订阅者 - %d\n", mid, v1.Name, v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
 
@@ -491,7 +520,7 @@ func main() {
 			}
 			mid, err := strconv.ParseInt(cm[1], 10, 64)
 			if err != nil {
-				u, err := bi.SubscribeFanjuByKeyword(packet.FromGroupID, cm[1])
+				u, err := bi.SubscribeFanjuByKeyword(packet.FromGroupID, cm[1], packet.FromUserID)
 				if err != nil {
 					b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 					return
@@ -500,7 +529,7 @@ func main() {
 				b.SendGroupPicMsg(packet.FromGroupID, "成功订阅番剧"+u.Result.Media.Title, r.Content())
 				return
 			}
-			u, err := bi.SubscribeFanjuByMid(packet.FromGroupID, mid)
+			u, err := bi.SubscribeFanjuByMid(packet.FromGroupID, mid, packet.FromUserID)
 			if err != nil {
 				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 				return
@@ -535,7 +564,7 @@ func main() {
 				return
 			}
 			for mid, v1 := range c.Fanjus {
-				ups += fmt.Sprintf("%d - %s\n", mid, v1.Title)
+				ups += fmt.Sprintf("%d - %s-订阅用户为：%d\n", mid, v1.Title, v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
 
