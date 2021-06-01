@@ -495,8 +495,8 @@ func main() {
 				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅UP主")
 				return
 			}
-			for mid, v1 := range c.BiliUps {
-				ups += fmt.Sprintf("%d - %s\n", mid, v1.Name)
+			for mid, v1  := range c.BiliUps {
+				ups += fmt.Sprintf("%d - %s -订阅者 -%d\n", mid, v1.Name, v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
 
@@ -551,7 +551,7 @@ func main() {
 				return
 			}
 			for mid, v1 := range c.Fanjus {
-				ups += fmt.Sprintf("%d - %s\n", mid, v1.Title)
+				ups += fmt.Sprintf("%d - %s-订阅用户为：\n", mid, v1.Title,v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
 
