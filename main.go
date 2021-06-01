@@ -5,10 +5,12 @@ import (
 	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/androidDns"
 	"OPQBot-QQGroupManager/draw"
+	"OPQBot-QQGroupManager/githubManager"
 	"OPQBot-QQGroupManager/methods"
 	"embed"
 	"encoding/base64"
 	"fmt"
+	_ "github.com/go-playground/webhooks/v6/github"
 	"github.com/mcoo/requests"
 	"io/fs"
 	"log"
@@ -45,6 +47,7 @@ func main() {
 	log.Println("QQ Group Manager -️" + version)
 	androidDns.SetDns()
 	go CheckUpdate()
+	app := iris.New()
 	b := OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)
 	err := b.AddEvent(OPQBot.EventNameOnDisconnected, func() {
 		log.Println("断开服务器")
@@ -52,6 +55,8 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
+	g := githubManager.NewManager(app, &b)
+
 	VerifyNum := map[string]*struct {
 		Status bool
 		Code   string
@@ -87,7 +92,34 @@ func main() {
 			}
 		}
 	})
-
+	err = b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
+		s := b.Session.SessionStart(packet.FromUin)
+		if v, err := s.GetString("github"); err == nil {
+			groupidI, err := s.Get("github_groupId")
+			if err != nil {
+				b.SendFriendTextMsg(packet.FromUin, err.Error())
+				return
+			}
+			groupId, ok := groupidI.(int64)
+			if !ok {
+				b.SendFriendTextMsg(packet.FromUin, "内部错误")
+				return
+			}
+			err = g.AddRepo(v, packet.Content, groupId)
+			if err != nil {
+				b.SendFriendTextMsg(packet.FromUin, err.Error())
+				s.Delete("github")
+				s.Delete("github_groupId")
+				return
+			}
+			b.SendFriendTextMsg(packet.FromUin, "成功!")
+			s.Delete("github")
+			s.Delete("github_groupId")
+		}
+	})
+	if err != nil {
+		log.Println(err)
+	}
 	// 黑名单优先级高于白名单
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, BlackGroupList, WhiteGroupList, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
@@ -291,19 +323,126 @@ func main() {
 			Config.Lock.RUnlock()
 		}
 		cm := strings.Split(packet.Content, " ")
+		s := b.Session.SessionStart(packet.FromUserID)
+		if packet.Content == "退出订阅" {
+			err := s.Delete("biliUps")
+			if err != nil {
+				log.Println(err)
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, "已经退出订阅")
+			return
+		}
+		if v, err := s.Get("biliUps"); err == nil {
+			id, err := strconv.Atoi(packet.Content)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, "序号错误, 输入“退出订阅”退出")
+				return
+			}
+			if v1, ok := v.(map[int]int64); ok {
+				if v2, ok := v1[id]; ok {
+					u, err := bi.SubscribeUpByMid(packet.FromGroupID, v2)
+					if err != nil {
+						b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+						err = s.Delete("biliUps")
+						if err != nil {
+							log.Println(err)
+						}
+						return
+					}
+					r, _ := requests.Get(u.Data.Card.Face)
+					b.SendGroupPicMsg(packet.FromGroupID, "成功订阅UP主"+u.Data.Card.Name, r.Content())
+					err = s.Delete("biliUps")
+					if err != nil {
+						log.Println(err)
+					}
+					return
+				} else {
+					b.SendGroupTextMsg(packet.FromGroupID, "序号不存在")
+					return
+				}
+
+			} else {
+				b.SendGroupTextMsg(packet.FromGroupID, "内部错误")
+				err := s.Delete("biliUps")
+				if err != nil {
+					log.Println(err)
+				}
+				return
+			}
+		}
+		if packet.Content == "本群Github" {
+			githubs := "本群订阅Github仓库\n"
+			list := g.GetGroupSubList(packet.FromGroupID)
+			if len(list) == 0 {
+				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅Github仓库")
+				return
+			}
+			for k, _ := range list {
+				githubs += fmt.Sprintf("%s \n", k)
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, githubs)
+		}
+		if len(cm) == 2 && cm[0] == "取消订阅Github" {
+			err := g.DelRepo(cm[1], packet.FromGroupID)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, "取消订阅成功!")
+
+		}
+		if len(cm) == 2 && cm[0] == "订阅Github" {
+			b.SendGroupTextMsg(packet.FromGroupID, "请私聊我发送该仓库的Webhook Secret!")
+			err := s.Set("github", cm[1])
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			err = s.Set("github_groupId", packet.FromGroupID)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+		}
 		if len(cm) == 2 && cm[0] == "订阅up" {
 			if !c.Bili {
 				return
 			}
 			mid, err := strconv.ParseInt(cm[1], 10, 64)
 			if err != nil {
-				u, err := bi.SubscribeUpByKeyword(packet.FromGroupID, cm[1])
+				result, err := bi.SearchUp(cm[1])
+				//u, err := bi.SubscribeUpByKeyword(packet.FromGroupID, cm[1])
+
 				if err != nil {
 					b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 					return
 				}
-				r, _ := requests.Get(u.Data.Card.Face)
-				b.SendGroupPicMsg(packet.FromGroupID, fmt.Sprintf("成功订阅UP主%s<%s>", u.Data.Card.Name, u.Data.Card.Mid), r.Content())
+				var (
+					resultStr []string
+					r         = map[int]int64{}
+				)
+				i := 0
+				for _, v := range result.Data.Result {
+					if v.IsUpuser == 1 {
+						resultStr = append(resultStr, fmt.Sprintf("[%d] %s(lv.%d) 粉丝数:%d", i+1, v.Uname, v.Level, v.Fans))
+						r[i+1] = v.Mid
+						i++
+						if len(r) >= 6 {
+							break
+						}
+					}
+				}
+				if len(r) == 0 {
+					b.SendGroupTextMsg(packet.FromGroupID, "没有找到UP哟~")
+					return
+				}
+				err = s.Set("biliUps", r)
+				if err != nil {
+					b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+					return
+				}
+				b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf("====输入序号选择UP====\n%s", strings.Join(resultStr, "\n")))
 				return
 			}
 			u, err := bi.SubscribeUpByMid(packet.FromGroupID, mid)
@@ -488,7 +627,7 @@ func main() {
 	if Config.CoreConfig.OPQWebConfig.Enable {
 		log.Println("启动Web 😊")
 		go func() {
-			app := iris.New()
+
 			Config.Lock.Lock()
 			sess = sessions.New(sessions.Config{Cookie: "OPQWebSession"})
 			if Config.CoreConfig.OPQWebConfig.CSRF == "" {
@@ -499,7 +638,6 @@ func main() {
 				}
 			}
 			fads, _ := fs.Sub(staticFs, "Web/dist/spa")
-
 			if Config.CoreConfig.ReverseProxy != "" {
 				// target, err := url.Parse(Config.CoreConfig.ReverseProxy)
 				if err != nil {
@@ -519,6 +657,7 @@ func main() {
 
 			// app.HandleDir("/", iris.Dir("./Web/dist/spa"))
 			Config.Lock.Unlock()
+
 			app.Use(beforeCsrf)
 			app.Use(sess.Handler())
 			app.WrapRouter(func(w http.ResponseWriter, r *http.Request, router http.HandlerFunc) {
@@ -535,7 +674,7 @@ func main() {
 						r.URL.Path = "/"
 					}
 				} else {
-					if r.URL.Path[0:4] != "/api" {
+					if r.URL.Path[0:4] != "/api" && r.URL.Path[0:4] != "/git" {
 						if !pathIsFile(path) {
 							r.URL.Path = "/"
 						}
