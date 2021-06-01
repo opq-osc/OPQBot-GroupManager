@@ -505,14 +505,12 @@ func (m *Manager) UnSubscribeUp(groupId int64, mid int64) (e error) {
 					Config.CoreConfig.GroupConfig[groupId] = v2
 				}
 				Config.Save()
-
 				return nil
 			}
 		}
-
-		return nil
+		return errors.New("没有订阅该UP")
 	} else {
-		return nil
+		return errors.New("没有订阅该UP")
 	}
 
 }
@@ -541,24 +539,26 @@ func (m *Manager) UnSubscribeFanju(groupId int64, mid int64) (e error) {
 			}
 		}
 
-		return nil
+		return errors.New("没有订阅该番剧")
 	} else {
-		return nil
+		return errors.New("没有订阅该番剧")
 	}
 
 }
-func (m *Manager) SubscribeUpByKeyword(groupId int64, keyword string) (u UpInfoResult, e error) {
-	if groupId == 0 {
-		e = errors.New("默认群禁止订阅!")
-		return
-	}
-	mid, e := m.SearchUp(keyword)
-	if e != nil {
-		return
-	}
-	u, e = m.SubscribeUpByMid(groupId, mid)
-	return
-}
+
+//func (m *Manager) SubscribeUpByKeyword(groupId int64, keyword string) (u UpInfoResult, e error) {
+//	if groupId == 0 {
+//		e = errors.New("默认群禁止订阅!")
+//		return
+//	}
+//	mid, e := m.SearchUp(keyword)
+//	if e != nil {
+//		return
+//	}
+//	u, e = m.SubscribeUpByMid(groupId, mid)
+//	return
+//}
+
 func (m *Manager) SubscribeFanjuByKeyword(groupId int64, keyword string) (u BiliFanjuResult, e error) {
 	if groupId == 0 {
 		e = errors.New("默认群禁止订阅!")
@@ -735,25 +735,14 @@ func (m *Manager) SubscribeFanjuByMid(groupId int64, mediaId int64) (u BiliFanju
 
 	return
 }
-func (m *Manager) SearchUp(keyword string) (mid int64, err error) {
+func (m *Manager) SearchUp(keyword string) (result SearchResult, err error) {
 	res, err := m.r.Get("https://api.bilibili.com/x/web-interface/search/type?context=&search_type=bili_user&page=1&order=&category_id=&user_type=&order_sort=&changing=mid&__refresh__=true&_extra=&highlight=1&single_column=0&keyword=" + keyword)
 	if err != nil {
 		return
 	}
-	var result SearchResult
 	err = res.Json(&result)
 	if err != nil {
 		return
-	}
-	mid = 0
-	for _, v := range result.Data.Result {
-		if v.IsUpuser == 1 {
-			mid = v.Mid
-			break
-		}
-	}
-	if mid == 0 {
-		err = errors.New("没有找到UP")
 	}
 	return
 }

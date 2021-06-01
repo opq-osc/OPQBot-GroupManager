@@ -1,6 +1,7 @@
 package Config
 
 import (
+	"github.com/go-playground/webhooks/v6/github"
 	"io/ioutil"
 	"log"
 	"os"
@@ -30,6 +31,12 @@ type CoreConfigStruct struct {
 	BlackGroupList     []int64
 	GroupConfig        map[int64]GroupConfig
 	UserData           map[int64]UserData
+	GithubSub          map[string]Repo
+}
+type Repo struct {
+	Secret  string
+	WebHook *github.Webhook
+	Groups  []int64
 }
 type UserData struct {
 	LastSignDay int
