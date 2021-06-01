@@ -184,12 +184,14 @@ type SearchResult struct {
 type Up struct {
 	Name    string
 	Created int64
+	UserId int64
 	Groups  []int64
 }
 type Fanju struct {
 	Title  string
 	Id     int64
 	Groups []int64
+	UserId int64
 }
 
 type BiliResult struct {
@@ -559,7 +561,7 @@ func (m *Manager) UnSubscribeFanju(groupId int64, mid int64) (e error) {
 //	return
 //}
 
-func (m *Manager) SubscribeFanjuByKeyword(groupId int64, keyword string) (u BiliFanjuResult, e error) {
+func (m *Manager) SubscribeFanjuByKeyword(groupId int64, keyword string , userId int64) (u BiliFanjuResult, e error) {
 	if groupId == 0 {
 		e = errors.New("默认群禁止订阅!")
 		return
@@ -568,10 +570,10 @@ func (m *Manager) SubscribeFanjuByKeyword(groupId int64, keyword string) (u Bili
 	if e != nil {
 		return
 	}
-	u, e = m.SubscribeFanjuByMid(groupId, mediaId)
+	u, e = m.SubscribeFanjuByMid(groupId, mediaId,userId)
 	return
 }
-func (m *Manager) SubscribeUpByMid(groupId int64, mid int64) (u UpInfoResult, e error) {
+func (m *Manager) SubscribeUpByMid(groupId int64, mid int64 , userId int64) (u UpInfoResult, e error) {
 	if groupId == 0 {
 		e = errors.New("默认群禁止订阅!")
 		return
@@ -613,14 +615,14 @@ func (m *Manager) SubscribeUpByMid(groupId int64, mid int64) (u UpInfoResult, e 
 				if v.BiliUps == nil {
 					v.BiliUps = map[int64]Config.Up{}
 				}
-				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: up.Created}
+				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: up.Created , UserId : userId}
 				Config.CoreConfig.GroupConfig[groupId] = v
 			} else {
 				if v.BiliUps == nil {
 					v.BiliUps = map[int64]Config.Up{}
 				}
 				v = Config.CoreConfig.DefaultGroupConfig
-				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: up.Created}
+				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: up.Created , UserId : userId}
 				Config.CoreConfig.GroupConfig[groupId] = v
 			}
 			Config.Save()
@@ -631,14 +633,14 @@ func (m *Manager) SubscribeUpByMid(groupId int64, mid int64) (u UpInfoResult, e 
 				if v.BiliUps == nil {
 					v.BiliUps = map[int64]Config.Up{}
 				}
-				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: 0}
+				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: 0 ,UserId: userId}
 				Config.CoreConfig.GroupConfig[groupId] = v
 			} else {
 				if v.BiliUps == nil {
 					v.BiliUps = map[int64]Config.Up{}
 				}
 				v = Config.CoreConfig.DefaultGroupConfig
-				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: 0}
+				v.BiliUps[mid] = Config.Up{Name: u.Data.Card.Name, Created: 0 ,UserId: userId}
 				Config.CoreConfig.GroupConfig[groupId] = v
 			}
 			Config.Save()
@@ -647,7 +649,7 @@ func (m *Manager) SubscribeUpByMid(groupId int64, mid int64) (u UpInfoResult, e 
 	}
 	return
 }
-func (m *Manager) SubscribeFanjuByMid(groupId int64, mediaId int64) (u BiliFanjuResult, e error) {
+func (m *Manager) SubscribeFanjuByMid(groupId int64, mediaId int64 , userId int64) (u BiliFanjuResult, e error) {
 	if groupId == 0 {
 		e = errors.New("默认群禁止订阅!")
 		return
@@ -692,6 +694,7 @@ func (m *Manager) SubscribeFanjuByMid(groupId int64, mediaId int64) (u BiliFanju
 				v.Fanjus[mediaId] = Config.Fanju{
 					Title: u.Result.Media.Title,
 					Id:    fj.Id,
+					UserId: userId,
 				}
 				Config.CoreConfig.GroupConfig[groupId] = v
 			} else {
@@ -702,6 +705,7 @@ func (m *Manager) SubscribeFanjuByMid(groupId int64, mediaId int64) (u BiliFanju
 				v.Fanjus[mediaId] = Config.Fanju{
 					Title: u.Result.Media.Title,
 					Id:    fj.Id,
+					UserId: userId,
 				}
 				Config.CoreConfig.GroupConfig[groupId] = v
 			}
@@ -716,6 +720,7 @@ func (m *Manager) SubscribeFanjuByMid(groupId int64, mediaId int64) (u BiliFanju
 				v.Fanjus[mediaId] = Config.Fanju{
 					Title: u.Result.Media.Title,
 					Id:    0,
+					UserId: userId,
 				}
 				Config.CoreConfig.GroupConfig[groupId] = v
 			} else {
@@ -726,6 +731,7 @@ func (m *Manager) SubscribeFanjuByMid(groupId int64, mediaId int64) (u BiliFanju
 				v.Fanjus[mediaId] = Config.Fanju{
 					Title: u.Result.Media.Title,
 					Id:    0,
+					UserId: userId,
 				}
 				Config.CoreConfig.GroupConfig[groupId] = v
 			}
@@ -766,21 +772,23 @@ func (m *Manager) SearchFanju(keyword string) (mid int64, err error) {
 	}
 	return
 }
-func (m *Manager) GetUpGroupsByMid(mid int64) (upName string, g []int64) {
+func (m *Manager) GetUpGroupsByMid(mid int64) (upName string, g []int64 , userId int64) {
 	m.upsMapLock.RLock()
 	defer m.upsMapLock.RUnlock()
 	if v, ok := m.ups[mid]; ok {
 		g = v.Groups
 		upName = v.Name
+		userId = v.UserId
 	}
 	return
 }
-func (m *Manager) GetFanjuGroupsByMid(mid int64) (title string, g []int64) {
+func (m *Manager) GetFanjuGroupsByMid(mid int64) (title string, g []int64 , userId int64) {
 	m.fanjuMapLock.RLock()
 	defer m.fanjuMapLock.RUnlock()
 	if v, ok := m.fanjus[mid]; ok {
 		g = v.Groups
 		title = v.Title
+		userId = v.UserId
 	}
 	return
 }
