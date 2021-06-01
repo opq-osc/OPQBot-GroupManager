@@ -42,7 +42,7 @@ type WebResult struct {
 var staticFs embed.FS
 
 func main() {
-	log.Println("QQ Group Manager✈️" + version)
+	log.Println("QQ Group Manager -️" + version)
 	androidDns.SetDns()
 	go CheckUpdate()
 	b := OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)
