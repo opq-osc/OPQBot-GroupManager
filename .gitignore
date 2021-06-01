@@ -12,5 +12,5 @@ go.sum
 *.log
 _*
 dist/
-dist/
+OPQBot-QQGroupManager
 !.goreleaser.yml
