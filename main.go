@@ -109,15 +109,28 @@ func main() {
 					}
 				}
 				res, _ := requests.Get(v.Result.Media.Cover)
-				b.Send(OPQBot.SendMsgPack{
-					SendToType: OPQBot.SendToTypeGroup,
-					ToUserUid:  g,
-					Content: OPQBot.SendTypePicMsgByBase64Content{
-						Content: OPQBot.MacroAt([]int64{userId}) + fmt.Sprintf("您订阅的番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow),
-						Base64:  base64.StdEncoding.EncodeToString(res.Content()),
-						Flash:   false,
-					},
-				})
+				if userId != 0 {
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypeGroup,
+						ToUserUid:  g,
+						Content: OPQBot.SendTypePicMsgByBase64Content{
+							Content: OPQBot.MacroAt([]int64{userId}) + fmt.Sprintf("您订阅的番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow),
+							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
+							Flash:   false,
+						},
+					})
+				} else {
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypeGroup,
+						ToUserUid:  g,
+						Content: OPQBot.SendTypePicMsgByBase64Content{
+							Content: fmt.Sprintf("不知道是谁订阅的番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow),
+							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
+							Flash:   false,
+						},
+					})
+				}
+
 			}
 		}
 	})
