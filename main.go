@@ -194,20 +194,20 @@ func main() {
 			})
 			return
 		}
-		if m, err := regexp.MatchString(c.ShutUpWord, packet.Content); err != nil {
-			log.Println(err)
-			return
-		} else if m {
-			err := b.ReCallMsg(packet.FromGroupID, packet.MsgRandom, packet.MsgSeq)
-			if err != nil {
-				log.Println(err)
-			}
-			err = b.SetForbidden(1, c.ShutUpTime, packet.FromGroupID, packet.FromUserID)
-			if err != nil {
-				log.Println(err)
-			}
-			return
-		}
+		//if m, err := regexp.MatchString(c.ShutUpWord, packet.Content); err != nil {
+		//	log.Println(err)
+		//	return
+		//} else if m {
+		//	err := b.ReCallMsg(packet.FromGroupID, packet.MsgRandom, packet.MsgSeq)
+		//	if err != nil {
+		//		log.Println(err)
+		//	}
+		//	err = b.SetForbidden(1, c.ShutUpTime, packet.FromGroupID, packet.FromUserID)
+		//	if err != nil {
+		//		log.Println(err)
+		//	}
+		//	return
+		//}
 		if v, _ := regexp.MatchString(`[0-9]{6}`, packet.Content); v {
 			VerifyLock.Lock()
 			if v1, ok := VerifyNum[strconv.FormatInt(packet.FromUserID, 10)+"|"+strconv.FormatInt(packet.FromGroupID, 10)]; ok {
@@ -580,7 +580,7 @@ func main() {
 				return
 			}
 			for mid, v1 := range c.Fanjus {
-				ups += fmt.Sprintf("%d - %s-订阅用户为：%s \n", mid, v1.Title,v1.UserId)
+				ups += fmt.Sprintf("%d - %s-订阅用户为：%d \n", mid, v1.Title,v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
 		}
