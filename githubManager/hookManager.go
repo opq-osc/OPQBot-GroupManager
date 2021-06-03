@@ -104,7 +104,6 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 				return
 			}
 		}
-		log.Println(payload)
 		switch v := payload.(type) {
 		case github.PingPayload:
 			log.Println(v)
@@ -112,6 +111,9 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 			var commitString []string
 			for _, v1 := range v.Commits {
 				commitString = append(commitString, fmt.Sprintf("[%s] %s", v1.Timestamp, v1.Message))
+			}
+			if len(commitString) == 0 {
+				return
 			}
 			r, _ := requests.Get(v.Sender.AvatarURL)
 			for _, v1 := range h.Groups {
@@ -124,8 +126,9 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 
 			}
 		case github.PullRequestPayload:
+			r, _ := requests.Get(v.Sender.AvatarURL)
 			for _, v1 := range h.Groups {
-				m.b.SendGroupTextMsg(v1, fmt.Sprintf("%s\nPR: %s", v.Repository.FullName, v.PullRequest.Body))
+				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\nPR:\n%s to %s", v.Repository.FullName, v.PullRequest.Head.Label, v.PullRequest.Base.Label), r.Content())
 			}
 
 		}
