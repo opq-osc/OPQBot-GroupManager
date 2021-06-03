@@ -1,7 +1,6 @@
 package main
 
 import (
-	"OPQBot-QQGroupManager"
 	"github.com/mcoo/requests"
 	"log"
 	"runtime"
@@ -94,7 +93,7 @@ func CheckUpdate() {
 		log.Println(err)
 		return
 	}
-	if !strings.HasSuffix(result.TagName, main.version) {
+	if !strings.HasSuffix(result.TagName, version) {
 		log.Println("检测到更新欧~ " + result.TagName)
 		if result.Prerelease {
 			log.Println("注意最新版本为预发行版本")
