@@ -361,8 +361,8 @@ func NewManager() (m Manager) {
 				m.ups[mid] = Up{
 					Name:    v1.Name,
 					Created: v1.Created,
-					Groups:  []int64{groupId},
 					UserId:  v1.UserId,
+					Groups:  []int64{groupId},
 				}
 			}
 		}
@@ -373,8 +373,8 @@ func NewManager() (m Manager) {
 				m.fanjus[mid] = Fanju{
 					Title:  v1.Title,
 					Id:     v1.Id,
-					Groups: []int64{groupId},
 					UserId: v1.UserId,
+					Groups: []int64{groupId},
 				}
 			}
 		}
