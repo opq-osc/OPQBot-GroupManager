@@ -24,6 +24,7 @@ type CoreConfigStruct struct {
 		Url string
 		QQ  int64
 	}
+	YiQing             bool
 	ReverseProxy       string
 	DefaultGroupConfig GroupConfig
 	SuperAdminUin      int64

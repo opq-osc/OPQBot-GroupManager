@@ -117,18 +117,29 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 			}
 			r, _ := requests.Get(v.Sender.AvatarURL)
 			for _, v1 := range h.Groups {
-				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\nCommit:\n%s", v.Repository.FullName, strings.Join(commitString, "\n")), r.Content())
+				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\n%s发起了Push\nCommit:\n%s", v.Repository.FullName, v.Pusher.Name, strings.Join(commitString, "\n")), r.Content())
 			}
 		case github.ReleasePayload:
 			r, _ := requests.Get(v.Sender.AvatarURL)
+
 			for _, v1 := range h.Groups {
-				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\n发布了:\n%s", v.Repository.FullName, v.Release.TagName), r.Content())
+				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\n%s发布了新版本:\n%s", v.Repository.FullName, v.Sender.Login, v.Release.TagName), r.Content())
 
 			}
 		case github.PullRequestPayload:
-			r, _ := requests.Get(v.Sender.AvatarURL)
+			r, _ := requests.Get(v.PullRequest.User.AvatarURL)
+			msg := ""
+			switch v.Action {
+			case "closed":
+				msg = fmt.Sprintf("%s\n%s关闭了PR:%s to %s", v.Repository.FullName, v.PullRequest.User.Login, v.PullRequest.Head.Label, v.PullRequest.Base.Label)
+			case "opened":
+				msg = fmt.Sprintf("%s\n%s打开了PR:%s to %s", v.Repository.FullName, v.PullRequest.User.Login, v.PullRequest.Head.Label, v.PullRequest.Base.Label)
+			default:
+				ctx.StatusCode(503)
+				return
+			}
 			for _, v1 := range h.Groups {
-				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\nPR:\n%s to %s", v.Repository.FullName, v.PullRequest.Head.Label, v.PullRequest.Base.Label), r.Content())
+				m.b.SendGroupPicMsg(v1, msg, r.Content())
 			}
 
 		}
