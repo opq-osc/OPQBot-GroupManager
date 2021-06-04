@@ -3,12 +3,14 @@ package main
 import (
 	bili "OPQBot-QQGroupManager/Bili"
 	"OPQBot-QQGroupManager/Config"
+	"OPQBot-QQGroupManager/GengChaxun"
 	"OPQBot-QQGroupManager/androidDns"
 	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/githubManager"
 	"OPQBot-QQGroupManager/methods"
 	"OPQBot-QQGroupManager/utils"
 	"OPQBot-QQGroupManager/yiqing"
+	"bytes"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
@@ -583,6 +585,44 @@ func main() {
 				ups += fmt.Sprintf("%d - %s-订阅用户为：%d \n", mid, v1.Title,v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
+		}
+		if len(cm) == 2 && cm[0] == "梗查询"{
+			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf("正在查询梗%s",cm[1]))
+			client := &http.Client{}
+			baseUrl := "https://api.jikipedia.com/go/search_entities"
+			postData := make(map[string]interface{})
+			postData["phrase"] = cm[1]
+			postData["page"] = 1
+			bytesData, err := json.Marshal(postData)
+			if err != nil {
+				fmt.Println(err.Error() )
+				return
+			}
+			reader := bytes.NewReader(bytesData)
+			req ,err := http.NewRequest("POST",baseUrl,reader)
+			req.Header.Add("User-Agent","Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1")
+			req.Header.Add("referer" , "https://broccoli.uc.cn/" )
+			req.Header.Set("Content-Type", "application/json;charset=UTF-8")
+			if(err !=nil){
+				panic(err)
+			}
+			response, _ := client.Do(req)
+			defer response.Body.Close()
+			s,err:=ioutil.ReadAll(response.Body)
+			var res GengChaxun.GenChaxunRes
+			json.Unmarshal(s, &res)
+			var content string
+			 tags = "[标签为：]"
+			for i , a := range res.Data {
+				if i == 1{
+					for j ,b := range a.Definitions{
+						if j == 0 {
+							content = b.Plaintext
+						}
+					}
+				}
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf( "%s",content))
 		}
 		if packet.Content == "疫情信息"{
 			b.SendGroupTextMsg(packet.FromGroupID, "正在查找信息")

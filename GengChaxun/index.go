@@ -6,10 +6,12 @@ type GenChaxunRes struct {
 
 type DataRes struct {
 	Definitions []Items `json:"definitions"`
+	Tags []TageItem `json:"tags"`
 }
 
 type Items struct {
 	Content string `json:"content"`
+	Plaintext string `json:"plaintext"`
 	Images []ImageItem `json:"images"`
 }
 
@@ -19,4 +21,7 @@ type ImageItem struct {
 
 type FullItem struct {
 	Path string `json:"path"`
+}
+type TageItem struct {
+	Name string `json:"name"`
 }
