@@ -612,7 +612,6 @@ func main() {
 			var res GengChaxun.GenChaxunRes
 			json.Unmarshal(s, &res)
 			var content string
-			 tags = "[标签为：]"
 			for i , a := range res.Data {
 				if i == 1{
 					for j ,b := range a.Definitions{
