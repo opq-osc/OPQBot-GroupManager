@@ -3,12 +3,14 @@ package main
 import (
 	bili "OPQBot-QQGroupManager/Bili"
 	"OPQBot-QQGroupManager/Config"
+	"OPQBot-QQGroupManager/GengChaxun"
 	"OPQBot-QQGroupManager/androidDns"
 	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/githubManager"
 	"OPQBot-QQGroupManager/methods"
 	"OPQBot-QQGroupManager/utils"
 	"OPQBot-QQGroupManager/yiqing"
+	"bytes"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
@@ -50,7 +52,7 @@ var staticFs embed.FS
 func main() {
 	log.Println("QQ Group Manager -️" + version)
 	androidDns.SetDns()
-	go CheckUpdate()
+	//go CheckUpdate()
 	app := iris.New()
 	b := OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)
 	err := b.AddEvent(OPQBot.EventNameOnDisconnected, func() {
@@ -72,7 +74,7 @@ func main() {
 	c.AddJob(-1, "Bili", "*/5 * * * *", func() {
 		update, fanju := bi.ScanUpdate()
 		for _, v := range update {
-			upName, gs, userId := bi.GetUpGroupsByMid(v.Mid)
+			upName, gs ,userId := bi.GetUpGroupsByMid(v.Mid)
 			for _, g := range gs {
 				if v1, ok := Config.CoreConfig.GroupConfig[g]; ok {
 					if !v1.Bili {
@@ -80,32 +82,19 @@ func main() {
 					}
 				}
 				res, _ := requests.Get(v.Pic)
-				if userId != 0 {
-					b.Send(OPQBot.SendMsgPack{
-						SendToType: OPQBot.SendToTypeGroup,
-						ToUserUid:  g,
-						Content: OPQBot.SendTypePicMsgByBase64Content{
-							Content: OPQBot.MacroAt([]int64{userId}) + fmt.Sprintf("您订阅的UP主%s更新了\n%s\n%s", upName, v.Title, v.Description),
-							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
-							Flash:   false,
-						},
-					})
-				} else {
-					b.Send(OPQBot.SendMsgPack{
-						SendToType: OPQBot.SendToTypeGroup,
-						ToUserUid:  g,
-						Content: OPQBot.SendTypePicMsgByBase64Content{
-							Content: fmt.Sprintf("不知道是谁订阅的UP主%s更新了\n%s\n%s", upName, v.Title, v.Description),
-							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
-							Flash:   false,
-						},
-					})
-				}
-
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypeGroup,
+					ToUserUid:  g,
+					Content: OPQBot.SendTypePicMsgByBase64Content{
+						Content: OPQBot.MacroAt([]int64{userId}) + fmt.Sprintf("您订阅的UP主%s更新了\n%s\n%s", upName, v.Title, v.Description),
+						Base64:  base64.StdEncoding.EncodeToString(res.Content()),
+						Flash:   false,
+					},
+				})
 			}
 		}
 		for _, v := range fanju {
-			title, gs, userId := bi.GetFanjuGroupsByMid(v.Result.Media.MediaID)
+			title, gs ,userId:= bi.GetFanjuGroupsByMid(v.Result.Media.MediaID)
 			for _, g := range gs {
 				if v1, ok := Config.CoreConfig.GroupConfig[g]; ok {
 					if !v1.Bili {
@@ -113,61 +102,43 @@ func main() {
 					}
 				}
 				res, _ := requests.Get(v.Result.Media.Cover)
-				if userId != 0 {
-					b.Send(OPQBot.SendMsgPack{
-						SendToType: OPQBot.SendToTypeGroup,
-						ToUserUid:  g,
-						Content: OPQBot.SendTypePicMsgByBase64Content{
-							Content: OPQBot.MacroAt([]int64{userId}) + fmt.Sprintf("您订阅的番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow),
-							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
-							Flash:   false,
-						},
-					})
-				} else {
-					b.Send(OPQBot.SendMsgPack{
-						SendToType: OPQBot.SendToTypeGroup,
-						ToUserUid:  g,
-						Content: OPQBot.SendTypePicMsgByBase64Content{
-							Content: fmt.Sprintf("不知道是谁订阅的番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow),
-							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
-							Flash:   false,
-						},
-					})
-				}
-
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypeGroup,
+					ToUserUid:  g,
+					Content: OPQBot.SendTypePicMsgByBase64Content{
+						Content: OPQBot.MacroAt([]int64{userId}) + fmt.Sprintf("您订阅的番剧%s更新了\n%s", title, v.Result.Media.NewEp.IndexShow),
+						Base64:  base64.StdEncoding.EncodeToString(res.Content()),
+						Flash:   false,
+					},
+				})
 			}
 		}
 	})
-	Config.Lock.RLock()
-	yq := Config.CoreConfig.YiQing
-	Config.Lock.RUnlock()
-	if yq {
-		c.AddJob(-1, "Yiqing", "* * 8,18 * * ? ", func() {
-			client := &http.Client{}
-			baseUrl := "https://m.sm.cn/api/rest?method=Huoshenshan.local"
-			req, err := http.NewRequest("GET", baseUrl, nil)
-			req.Header.Add("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1")
-			req.Header.Add("referer", "https://broccoli.uc.cn/")
-			if err != nil {
-				panic(err)
-			}
-			response, _ := client.Do(req)
-			defer response.Body.Close()
-			s, err := ioutil.ReadAll(response.Body)
-			var res yiqing.YiqingRes
-			json.Unmarshal(s, &res)
-			ups := fmt.Sprintf("疫情报告")
-			ups += fmt.Sprintf("%s-%s\n全国单日报告%s\n", res.Title, res.Time, res.MainReport.Report)
-			ups += fmt.Sprintf("[表情190][表情190][表情190]信息总览[表情190][表情190][表情190]\n")
-			ups += fmt.Sprintf("[表情145]全国累计确诊%s个昨日新增%s个\n", res.ContryData.SureCnt, res.ContryData.YstCureCnt)
-			ups += fmt.Sprintf("[表情145]全国现存确诊%s个昨日新增%s个\n", res.ContryData.RestSureCnt, res.ContryData.RestSureCntIncr)
-			ups += fmt.Sprintf("[表情145]累计输入确诊%s个\n", res.ContryData.InputCnt)
-			ups += fmt.Sprintf("[表情145]全国累计治愈%s个昨日新增%s个\n", res.ContryData.CureCnt, res.ContryData.YstCureCnt)
-			ups += fmt.Sprintf("[表情66][表情66][表情66]疫情当下，请注意保护安全")
-			b.SendGroupTextMsg(-1, fmt.Sprintf(ups))
-			//fmt.Println(ups)
-		})
-	}
+	c.AddJob(-1, "Yiqing" ,"* * 8,18 * * ? " , func() {
+		client := &http.Client{}
+		baseUrl := "https://m.sm.cn/api/rest?method=Huoshenshan.local"
+		req ,err := http.NewRequest("GET",baseUrl,nil)
+		req.Header.Add("User-Agent","Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1")
+		req.Header.Add("referer" , "https://broccoli.uc.cn/" )
+		if(err !=nil){
+			panic(err)
+		}
+		response, _ := client.Do(req)
+		defer response.Body.Close()
+		s,err:=ioutil.ReadAll(response.Body)
+		var res yiqing.YiqingRes
+		json.Unmarshal(s, &res)
+		ups := fmt.Sprintf("疫情报告")
+		ups += fmt.Sprintf("%s-%s\n全国单日报告%s\n" ,res.Title ,res.Time,res.MainReport.Report)
+		ups += fmt.Sprintf("[表情190][表情190][表情190]信息总览[表情190][表情190][表情190]\n")
+		ups += fmt.Sprintf("[表情145]全国累计确诊%s个昨日新增%s个\n",res.ContryData.SureCnt,res.ContryData.YstCureCnt)
+		ups += fmt.Sprintf("[表情145]全国现存确诊%s个昨日新增%s个\n",res.ContryData.RestSureCnt,res.ContryData.RestSureCntIncr)
+		ups += fmt.Sprintf("[表情145]累计输入确诊%s个\n",res.ContryData.InputCnt)
+		ups += fmt.Sprintf("[表情145]全国累计治愈%s个昨日新增%s个\n",res.ContryData.CureCnt,res.ContryData.YstCureCnt)
+		ups += fmt.Sprintf("[表情66][表情66][表情66]疫情当下，请注意保护安全")
+		b.SendGroupTextMsg(-1, fmt.Sprintf(ups))
+		fmt.Println(ups)
+	})
 	err = b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
 		s := b.Session.SessionStart(packet.FromUin)
 		if v, err := s.GetString("github"); err == nil {
@@ -416,7 +387,7 @@ func main() {
 			}
 			if v1, ok := v.(map[int]int64); ok {
 				if v2, ok := v1[id]; ok {
-					u, err := bi.SubscribeUpByMid(packet.FromGroupID, v2, packet.FromUserID)
+					u, err := bi.SubscribeUpByMid(packet.FromGroupID, v2 ,packet.FromUserID)
 					if err != nil {
 						b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 						err = s.Delete("biliUps")
@@ -521,7 +492,7 @@ func main() {
 				b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf("====输入序号选择UP====\n%s", strings.Join(resultStr, "\n")))
 				return
 			}
-			u, err := bi.SubscribeUpByMid(packet.FromGroupID, mid, packet.FromUserID)
+			u, err := bi.SubscribeUpByMid(packet.FromGroupID, mid , packet.FromUserID)
 			if err != nil {
 				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 				return
@@ -555,7 +526,7 @@ func main() {
 				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅UP主")
 				return
 			}
-			for mid, v1 := range c.BiliUps {
+			for mid, v1  := range c.BiliUps {
 				ups += fmt.Sprintf("%d - %s -订阅者:%d\n", mid, v1.Name, v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
@@ -567,7 +538,7 @@ func main() {
 			}
 			mid, err := strconv.ParseInt(cm[1], 10, 64)
 			if err != nil {
-				u, err := bi.SubscribeFanjuByKeyword(packet.FromGroupID, cm[1], packet.FromUserID)
+				u, err := bi.SubscribeFanjuByKeyword(packet.FromGroupID, cm[1],packet.FromUserID)
 				if err != nil {
 					b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 					return
@@ -576,7 +547,7 @@ func main() {
 				b.SendGroupPicMsg(packet.FromGroupID, "成功订阅番剧"+u.Result.Media.Title, r.Content())
 				return
 			}
-			u, err := bi.SubscribeFanjuByMid(packet.FromGroupID, mid, packet.FromUserID)
+			u, err := bi.SubscribeFanjuByMid(packet.FromGroupID, mid,packet.FromUserID)
 			if err != nil {
 				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
 				return
@@ -611,31 +582,68 @@ func main() {
 				return
 			}
 			for mid, v1 := range c.Fanjus {
-				ups += fmt.Sprintf("%d - %s-订阅用户为：%d \n", mid, v1.Title, v1.UserId)
+				ups += fmt.Sprintf("%d - %s-订阅用户为：%d \n", mid, v1.Title,v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
 		}
-		if packet.Content == "疫情信息" {
-			b.SendGroupTextMsg(packet.FromGroupID, "正在查找信息")
+		if len(cm) == 2 && cm[0] == "梗查询"{
+			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf("正在查询梗%s",cm[1]))
 			client := &http.Client{}
-			baseUrl := "https://m.sm.cn/api/rest?method=Huoshenshan.local"
-			req, err := http.NewRequest("GET", baseUrl, nil)
-			req.Header.Add("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1")
-			req.Header.Add("referer", "https://broccoli.uc.cn/")
+			baseUrl := "https://api.jikipedia.com/go/search_entities"
+			postData := make(map[string]interface{})
+			postData["phrase"] = cm[1]
+			postData["page"] = 1
+			bytesData, err := json.Marshal(postData)
 			if err != nil {
+				fmt.Println(err.Error() )
+				return
+			}
+			reader := bytes.NewReader(bytesData)
+			req ,err := http.NewRequest("POST",baseUrl,reader)
+			req.Header.Add("User-Agent","Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1")
+			req.Header.Add("referer" , "https://broccoli.uc.cn/" )
+			req.Header.Set("Content-Type", "application/json;charset=UTF-8")
+			if(err !=nil){
 				panic(err)
 			}
 			response, _ := client.Do(req)
 			defer response.Body.Close()
-			s, err := ioutil.ReadAll(response.Body)
+			s,err:=ioutil.ReadAll(response.Body)
+			var res GengChaxun.GenChaxunRes
+			json.Unmarshal(s, &res)
+			var content string
+			for i , a := range res.Data {
+				if i == 1{
+					for j ,b := range a.Definitions{
+						if j == 0 {
+							content = b.Plaintext
+						}
+					}
+				}
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf( "%s",content))
+		}
+		if packet.Content == "疫情信息"{
+			b.SendGroupTextMsg(packet.FromGroupID, "正在查找信息")
+			client := &http.Client{}
+			baseUrl := "https://m.sm.cn/api/rest?method=Huoshenshan.local"
+			req ,err := http.NewRequest("GET",baseUrl,nil)
+			req.Header.Add("User-Agent","Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1")
+			req.Header.Add("referer" , "https://broccoli.uc.cn/" )
+			if(err !=nil){
+				panic(err)
+			}
+			response, _ := client.Do(req)
+			defer response.Body.Close()
+			s,err:=ioutil.ReadAll(response.Body)
 			var res yiqing.YiqingRes
 			json.Unmarshal(s, &res)
-			ups := fmt.Sprintf("%s-%s\n全国单日报告%s\n", res.Title, res.Time, res.MainReport.Report)
+			ups := fmt.Sprintf("%s-%s\n全国单日报告%s\n" ,res.Title ,res.Time,res.MainReport.Report)
 			ups += fmt.Sprintf("[表情190][表情190][表情190]信息总览[表情190][表情190][表情190]\n")
-			ups += fmt.Sprintf("[表情145]全国累计确诊%s个昨日新增%s个\n", res.ContryData.SureCnt, res.ContryData.YstCureCnt)
-			ups += fmt.Sprintf("[表情145]全国现存确诊%s个昨日新增%s个\n", res.ContryData.RestSureCnt, res.ContryData.RestSureCntIncr)
-			ups += fmt.Sprintf("[表情145]累计输入确诊%s个\n", res.ContryData.InputCnt)
-			ups += fmt.Sprintf("[表情145]全国累计治愈%s个昨日新增%s个\n", res.ContryData.CureCnt, res.ContryData.YstCureCnt)
+			ups += fmt.Sprintf("[表情145]全国累计确诊%s个昨日新增%s个\n",res.ContryData.SureCnt,res.ContryData.YstCureCnt)
+			ups += fmt.Sprintf("[表情145]全国现存确诊%s个昨日新增%s个\n",res.ContryData.RestSureCnt,res.ContryData.RestSureCntIncr)
+			ups += fmt.Sprintf("[表情145]累计输入确诊%s个\n",res.ContryData.InputCnt)
+			ups += fmt.Sprintf("[表情145]全国累计治愈%s个昨日新增%s个\n",res.ContryData.CureCnt,res.ContryData.YstCureCnt)
 			ups += fmt.Sprintf("[表情66][表情66][表情66]疫情当下，请注意保护安全")
 			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf(ups))
 			fmt.Println(ups)
