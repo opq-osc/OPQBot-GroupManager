@@ -121,11 +121,15 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 			}
 		case github.ReleasePayload:
 			r, _ := requests.Get(v.Sender.AvatarURL)
-
-			for _, v1 := range h.Groups {
-				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\n%s发布了新版本:\n%s", v.Repository.FullName, v.Sender.Login, v.Release.TagName), r.Content())
+			switch v.Action {
+			case "published":
+				for _, v1 := range h.Groups {
+					m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\n%s发布了新版本:\n%s", v.Repository.FullName, v.Sender.Login, v.Release.TagName), r.Content())
+				}
+			default:
 
 			}
+
 		case github.PullRequestPayload:
 			r, _ := requests.Get(v.PullRequest.User.AvatarURL)
 			msg := ""
