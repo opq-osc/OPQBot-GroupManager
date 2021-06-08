@@ -92,7 +92,7 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 			ctx.StatusCode(404)
 			return
 		}
-		payload, err := h.WebHook.Parse((*ctx).Request(), github.PushEvent, github.PingEvent, github.ReleaseEvent, github.PullRequestEvent)
+		payload, err := h.WebHook.Parse((*ctx).Request(), github.RepositoryEvent, github.PushEvent, github.PingEvent, github.ReleaseEvent, github.PullRequestEvent)
 		if err != nil {
 			log.Println(err)
 			if err == github.ErrEventNotFound {
@@ -107,6 +107,15 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 		switch v := payload.(type) {
 		case github.PingPayload:
 			log.Println(v)
+		case github.RepositoryPayload:
+			switch v.Action {
+			case "created":
+				r, _ := requests.Get(v.Sender.AvatarURL)
+				for _, v1 := range h.Groups {
+					m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s在%s发布了新的仓库: %s\n欢迎Star哟", v.Sender.Login, v.Organization.Login, v.Repository.FullName), r.Content())
+				}
+			}
+
 		case github.PushPayload:
 			var commitString []string
 			for _, v1 := range v.Commits {
@@ -121,11 +130,15 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 			}
 		case github.ReleasePayload:
 			r, _ := requests.Get(v.Sender.AvatarURL)
-
-			for _, v1 := range h.Groups {
-				m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\n%s发布了新版本:\n%s", v.Repository.FullName, v.Sender.Login, v.Release.TagName), r.Content())
+			switch v.Action {
+			case "published":
+				for _, v1 := range h.Groups {
+					m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s\n%s发布了新版本:\n%s", v.Repository.FullName, v.Sender.Login, v.Release.TagName), r.Content())
+				}
+			default:
 
 			}
+
 		case github.PullRequestPayload:
 			r, _ := requests.Get(v.PullRequest.User.AvatarURL)
 			msg := ""
