@@ -11,6 +11,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Manager struct {
@@ -119,7 +120,13 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 		case github.PushPayload:
 			var commitString []string
 			for _, v1 := range v.Commits {
-				commitString = append(commitString, fmt.Sprintf("[%s] %s", v1.Timestamp, v1.Message))
+				t, err := time.Parse("2006-01-02T15:04:05-0700", v1.Timestamp)
+				if err != nil {
+					log.Println(err)
+					commitString = append(commitString, fmt.Sprintf("[%s] %s", v1.Timestamp, v1.Message))
+				} else {
+					commitString = append(commitString, fmt.Sprintf("[%s] %s", t.Format("2006-01-02 15:04:05"), v1.Message))
+				}
 			}
 			if len(commitString) == 0 {
 				return
