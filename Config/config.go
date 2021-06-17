@@ -24,6 +24,7 @@ type CoreConfigStruct struct {
 		Url string
 		QQ  int64
 	}
+	BiliLive           bool
 	YiQing             bool
 	ReverseProxy       string
 	DefaultGroupConfig GroupConfig

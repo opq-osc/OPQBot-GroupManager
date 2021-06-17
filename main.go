@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/gaoyanpao/biliLiveHelper"
 	_ "github.com/go-playground/webhooks/v6/github"
 	"github.com/mcoo/requests"
 	"io/fs"
@@ -68,6 +69,8 @@ func main() {
 		Code   string
 	}{}
 	VerifyLock := sync.Mutex{}
+	live := bili.NewLiveManager()
+
 	c := utils.NewBotCronManager()
 	c.Start()
 	bi := bili.NewManager()
@@ -611,6 +614,48 @@ func main() {
 				ups += fmt.Sprintf("%d - %s-订阅用户为：%d \n", mid, v1.Title, v1.UserId)
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, ups)
+		}
+		if len(cm) == 2 && cm[0] == "stopBili" {
+			s, err := strconv.Atoi(cm[1])
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			err = live.RemoveClient(s)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, "已经断开连接了")
+		}
+		if len(cm) == 2 && cm[0] == "biliLive" {
+			if !Config.CoreConfig.BiliLive {
+				b.SendGroupTextMsg(packet.FromGroupID, "该功能没有启动")
+				return
+			}
+			s, err := strconv.Atoi(cm[1])
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			c, err := live.AddClient(s)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			c.OnGift = func(ctx *biliLiveHelper.Context) {
+				data := ctx.Msg
+				r, _ := requests.Get(data.Get("data").Get("face").MustString())
+				b.SendGroupPicMsg(packet.FromGroupID, fmt.Sprintf("%s%s%s", data.Get("data").Get("uname").MustString(), data.Get("data").Get("action").MustString(), data.Get("data").Get("giftName").MustString()), r.Content())
+			}
+			go c.Start()
+			info := c.GetRoomInfo()
+			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf("房间: %s[%d]\n关注: %d\n人气: %d\n直播状态: %v",
+				info.Title,
+				info.RoomID,
+				info.Attention,
+				info.Online,
+				bili.GetLiveStatusString(info.LiveStatus)))
 		}
 		if len(cm) == 2 && cm[0] == "梗查询" {
 			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf("正在查询梗%s", cm[1]))
