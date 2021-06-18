@@ -18,8 +18,7 @@ builds:
       - goos: android
         goarch: 386
     hooks:
-      post:
-        - cmd: ./upx.sh "{{ .Os }}" "{{ .Path }}"
+      post: ./upx.sh {{ .Os }} {{ .Path }}
 archives:
   -
     name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
