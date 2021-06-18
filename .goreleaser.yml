@@ -18,7 +18,7 @@ builds:
       - goos: android
         goarch: 386
     hooks:
-      post: upx --brute {{ .Path }}
+      post: upx {{ .Path }}
 archives:
   -
     name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
