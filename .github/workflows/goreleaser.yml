@@ -26,7 +26,7 @@ jobs:
         run: |
           npm install yarn -g
           npm install -g @quasar/cli
-          cd Web;yarn install;quasar build
+          chmod +x upx.sh;cd Web;yarn install;quasar build
       -
         name: Set up Go
         uses: actions/setup-go@v2
