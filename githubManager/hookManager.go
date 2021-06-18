@@ -93,7 +93,7 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 			ctx.StatusCode(404)
 			return
 		}
-		payload, err := h.WebHook.Parse((*ctx).Request(), github.RepositoryEvent, github.PushEvent, github.PingEvent, github.ReleaseEvent, github.PullRequestEvent)
+		payload, err := h.WebHook.Parse((*ctx).Request(), github.IssuesEvent, github.RepositoryEvent, github.PushEvent, github.PingEvent, github.ReleaseEvent, github.PullRequestEvent)
 		if err != nil {
 			log.Println(err)
 			if err == github.ErrEventNotFound {
@@ -108,9 +108,23 @@ func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
 		switch v := payload.(type) {
 		case github.PingPayload:
 			log.Println(v)
+		case github.IssuesPayload:
+			switch v.Action {
+			case "open":
+				r, _ := requests.Get(v.Sender.AvatarURL)
+				for _, v1 := range h.Groups {
+					m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s在%s发布了新的Issues: %s\n欢迎各位大佬前往解答！", v.Sender.Login, v.Repository.FullName, v.Issue.Title), r.Content())
+				}
+			}
+
 		case github.RepositoryPayload:
 			switch v.Action {
 			case "created":
+				r, _ := requests.Get(v.Sender.AvatarURL)
+				for _, v1 := range h.Groups {
+					m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s在%s发布了新的仓库: %s\n欢迎Star哟", v.Sender.Login, v.Organization.Login, v.Repository.FullName), r.Content())
+				}
+			case "transferred":
 				r, _ := requests.Get(v.Sender.AvatarURL)
 				for _, v1 := range h.Groups {
 					m.b.SendGroupPicMsg(v1, fmt.Sprintf("%s在%s发布了新的仓库: %s\n欢迎Star哟", v.Sender.Login, v.Organization.Login, v.Repository.FullName), r.Content())
