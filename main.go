@@ -37,7 +37,8 @@ import (
 )
 
 var (
-	version = "Ver.0.0.1"
+	version = "unknown"
+	date    = "none"
 	sess    *sessions.Sessions
 )
 
@@ -51,9 +52,9 @@ type WebResult struct {
 var staticFs embed.FS
 
 func main() {
-	log.Println("QQ Group Manager -️" + version)
+	log.Println("QQ Group Manager -️" + version + " 编译时间 " + date)
 	androidDns.SetDns()
-	//go CheckUpdate()
+	go CheckUpdate()
 	app := iris.New()
 	b := OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)
 	err := b.AddEvent(OPQBot.EventNameOnDisconnected, func() {
