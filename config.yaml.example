@@ -5,7 +5,7 @@ opqwebconfig:
     password: "1234567"
     enable: true
 opqbotconfig:
-    url: ""
+    url: "http://127.0.0.1:8888"
     qq: 0
 reverseproxy: ""
 defaultgroupconfig:
