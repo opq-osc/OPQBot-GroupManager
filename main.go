@@ -7,7 +7,6 @@ import (
 	"OPQBot-QQGroupManager/androidDns"
 	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/githubManager"
-	"OPQBot-QQGroupManager/methods"
 	"OPQBot-QQGroupManager/utils"
 	"OPQBot-QQGroupManager/yiqing"
 	"bytes"
@@ -199,6 +198,12 @@ func main() {
 	}
 	// 黑名单优先级高于白名单
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, BlackGroupList, WhiteGroupList, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
+		defer func() {
+			if err := recover(); err != nil {
+				fmt.Println("error:", err)
+			}
+		}()
+
 		if packet.FromUserID == botQQ {
 			return
 		}
@@ -226,20 +231,21 @@ func main() {
 			})
 			return
 		}
-		//if m, err := regexp.MatchString(c.ShutUpWord, packet.Content); err != nil {
-		//	log.Println(err)
-		//	return
-		//} else if m {
-		//	err := b.ReCallMsg(packet.FromGroupID, packet.MsgRandom, packet.MsgSeq)
-		//	if err != nil {
-		//		log.Println(err)
-		//	}
-		//	err = b.SetForbidden(1, c.ShutUpTime, packet.FromGroupID, packet.FromUserID)
-		//	if err != nil {
-		//		log.Println(err)
-		//	}
-		//	return
-		//}
+		if m, err := regexp.MatchString(c.ShutUpWord, packet.Content); err != nil {
+			log.Println(err)
+			return
+		} else if m {
+			err := b.ReCallMsg(packet.FromGroupID, packet.MsgRandom, packet.MsgSeq)
+			if err != nil {
+				log.Println(err)
+			}
+			err = b.SetForbidden(1, c.ShutUpTime, packet.FromGroupID, packet.FromUserID)
+			if err != nil {
+				log.Println(err)
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, OPQBot.MacroAt([]int64{packet.FromUserID})+"触发违禁词")
+			return
+		}
 		if v, _ := regexp.MatchString(`[0-9]{6}`, packet.Content); v {
 			VerifyLock.Lock()
 			if v1, ok := VerifyNum[strconv.FormatInt(packet.FromUserID, 10)+"|"+strconv.FormatInt(packet.FromGroupID, 10)]; ok {
@@ -270,7 +276,7 @@ func main() {
 					SendToType: OPQBot.SendToTypeGroup,
 					ToUserUid:  packet.FromGroupID,
 					Content: OPQBot.SendTypePicMsgByBase64Content{
-						Content: OPQBot.MacroAt([]int64{packet.FromUserID}) + "请在5分钟内输入上方图片验证码！否则会被移出群,若看不清楚可以输入 刷新验证码\n" + OPQBot.MacroId(),
+						Content: OPQBot.MacroAt([]int64{packet.FromUserID}) + "请在" + strconv.Itoa(c.JoinVerifyTime) + "分钟内输入上方图片验证码,全是数字哟！否则会被移出群,若看不清楚可以输入 刷新验证码\n" + OPQBot.MacroId(),
 						Base64:  base64.StdEncoding.EncodeToString(picB),
 						Flash:   false,
 					},
@@ -401,6 +407,69 @@ func main() {
 		}
 		cm := strings.Split(packet.Content, " ")
 		s := b.Session.SessionStart(packet.FromUserID)
+
+		// Github
+		if packet.Content == "本群Github" {
+			githubs := "本群订阅Github仓库\n"
+			list := g.GetGroupSubList(packet.FromGroupID)
+			if len(list) == 0 {
+				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅Github仓库")
+				return
+			}
+			for k, _ := range list {
+				githubs += fmt.Sprintf("%s \n", k)
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, githubs)
+		}
+		if len(cm) == 2 && cm[0] == "取消订阅Github" {
+			err := g.DelRepo(cm[1], packet.FromGroupID)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, "取消订阅成功!")
+
+		}
+		if len(cm) == 2 && cm[0] == "订阅Github" {
+			b.SendGroupTextMsg(packet.FromGroupID, "请私聊我发送该仓库的Webhook Secret!")
+			err := s.Set("github", cm[1])
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			err = s.Set("github_groupId", packet.FromGroupID)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+		}
+		if len(cm) == 2 && cm[0] == "DNS" {
+			dns, err := utils.DnsQuery(cm[1])
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			content := fmt.Sprintf("[%s]\n", cm[1])
+			if dns.Data.Num86[0].Answer.Error == "" {
+				content += fmt.Sprintf("中国: %s [%s] %ss\n", dns.Data.Num86[0].Answer.Records[0].Value, dns.Data.Num86[0].Answer.Records[0].IPLocation, dns.Data.Num86[0].Answer.TimeConsume)
+			} else {
+				content += "中国: " + dns.Data.Num86[0].Answer.Error + "\n"
+			}
+			if dns.Data.Num01[0].Answer.Error == "" {
+				content += fmt.Sprintf("美国: %s [%s] %ss\n", dns.Data.Num01[0].Answer.Records[0].Value, dns.Data.Num01[0].Answer.Records[0].IPLocation, dns.Data.Num01[0].Answer.TimeConsume)
+			} else {
+				content += "美国: " + dns.Data.Num01[0].Answer.Error + "\n"
+			}
+			if dns.Data.Num852[0].Answer.Error == "" {
+				content += fmt.Sprintf("香港: %s [%s] %ss", dns.Data.Num852[0].Answer.Records[0].Value, dns.Data.Num852[0].Answer.Records[0].IPLocation, dns.Data.Num852[0].Answer.TimeConsume)
+			} else {
+				content += "香港: " + dns.Data.Num852[0].Answer.Error
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, OPQBot.MacroAt([]int64{packet.FromUserID})+content)
+		}
+
+		// BiliBili
 		if packet.Content == "退出订阅" {
 			err := s.Delete("biliUps")
 			if err != nil {
@@ -408,6 +477,37 @@ func main() {
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, "已经退出订阅")
 			return
+		}
+		if packet.Content == "本群番剧" {
+			if !c.Bili {
+				return
+			}
+			ups := "本群订阅番剧\n"
+
+			if len(c.Fanjus) == 0 {
+				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅番剧")
+				return
+			}
+			for mid, v1 := range c.Fanjus {
+				ups += fmt.Sprintf("%d - %s-订阅用户为：%d \n", mid, v1.Title, v1.UserId)
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, ups)
+		}
+		if packet.Content == "本群up" {
+			if !c.Bili {
+				return
+			}
+			ups := "本群订阅UPs\n"
+
+			if len(c.BiliUps) == 0 {
+				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅UP主")
+				return
+			}
+			for mid, v1 := range c.BiliUps {
+				ups += fmt.Sprintf("%d - %s -订阅者:%d\n", mid, v1.Name, v1.UserId)
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, ups)
+
 		}
 		if v, err := s.Get("biliUps"); err == nil {
 			id, err := strconv.Atoi(packet.Content)
@@ -446,41 +546,6 @@ func main() {
 				}
 				return
 			}
-		}
-		if packet.Content == "本群Github" {
-			githubs := "本群订阅Github仓库\n"
-			list := g.GetGroupSubList(packet.FromGroupID)
-			if len(list) == 0 {
-				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅Github仓库")
-				return
-			}
-			for k, _ := range list {
-				githubs += fmt.Sprintf("%s \n", k)
-			}
-			b.SendGroupTextMsg(packet.FromGroupID, githubs)
-		}
-		if len(cm) == 2 && cm[0] == "取消订阅Github" {
-			err := g.DelRepo(cm[1], packet.FromGroupID)
-			if err != nil {
-				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
-				return
-			}
-			b.SendGroupTextMsg(packet.FromGroupID, "取消订阅成功!")
-
-		}
-		if len(cm) == 2 && cm[0] == "订阅Github" {
-			b.SendGroupTextMsg(packet.FromGroupID, "请私聊我发送该仓库的Webhook Secret!")
-			err := s.Set("github", cm[1])
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			err = s.Set("github_groupId", packet.FromGroupID)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-
 		}
 		if len(cm) == 2 && cm[0] == "订阅up" {
 			if !c.Bili {
@@ -546,22 +611,6 @@ func main() {
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, "成功取消订阅UP主")
 		}
-		if packet.Content == "本群up" {
-			if !c.Bili {
-				return
-			}
-			ups := "本群订阅UPs\n"
-
-			if len(c.BiliUps) == 0 {
-				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅UP主")
-				return
-			}
-			for mid, v1 := range c.BiliUps {
-				ups += fmt.Sprintf("%d - %s -订阅者:%d\n", mid, v1.Name, v1.UserId)
-			}
-			b.SendGroupTextMsg(packet.FromGroupID, ups)
-
-		}
 		if len(cm) == 2 && cm[0] == "订阅番剧" {
 			if !c.Bili {
 				return
@@ -600,21 +649,6 @@ func main() {
 				return
 			}
 			b.SendGroupTextMsg(packet.FromGroupID, "成功取消订阅番剧")
-		}
-		if packet.Content == "本群番剧" {
-			if !c.Bili {
-				return
-			}
-			ups := "本群订阅番剧\n"
-
-			if len(c.Fanjus) == 0 {
-				b.SendGroupTextMsg(packet.FromGroupID, "本群没有订阅番剧")
-				return
-			}
-			for mid, v1 := range c.Fanjus {
-				ups += fmt.Sprintf("%d - %s-订阅用户为：%d \n", mid, v1.Title, v1.UserId)
-			}
-			b.SendGroupTextMsg(packet.FromGroupID, ups)
 		}
 		if len(cm) == 2 && cm[0] == "stopBili" {
 			s, err := strconv.Atoi(cm[1])
@@ -658,6 +692,8 @@ func main() {
 				info.Online,
 				bili.GetLiveStatusString(info.LiveStatus)))
 		}
+
+		// 梗查询
 		if len(cm) == 2 && cm[0] == "梗查询" {
 			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf("正在查询梗%s", cm[1]))
 			client := &http.Client{}
@@ -700,6 +736,8 @@ func main() {
 			}
 
 		}
+
+		// 疫情信息
 		if packet.Content == "疫情信息" {
 			b.SendGroupTextMsg(packet.FromGroupID, "正在查找信息")
 			client := &http.Client{}
@@ -752,7 +790,7 @@ func main() {
 				SendToType: OPQBot.SendToTypeGroup,
 				ToUserUid:  packet.EventMsg.FromUin,
 				Content: OPQBot.SendTypePicMsgByBase64Content{
-					Content: OPQBot.MacroAt([]int64{packet.EventData.UserID}) + "请在5分钟内输入上方图片验证码！否则会被移出群,若看不清楚可以输入 刷新验证码\n" + OPQBot.MacroId(),
+					Content: OPQBot.MacroAt([]int64{packet.EventData.UserID}) + "请在" + strconv.Itoa(c.JoinVerifyTime) + "分钟内输入上方图片验证码！否则会被移出群,若看不清楚可以输入 刷新验证码\n" + OPQBot.MacroId(),
 					Base64:  base64.StdEncoding.EncodeToString(picB),
 					Flash:   false,
 				},
@@ -871,7 +909,7 @@ func main() {
 			app.Get("/api/csrf", func(ctx iris.Context) {
 				s := sess.Start(ctx)
 				salt := int(time.Now().Unix())
-				keyTmp := methods.Md5V(strconv.Itoa(salt + rand.Intn(100)))
+				keyTmp := utils.Md5V(strconv.Itoa(salt + rand.Intn(100)))
 				s.Set("OPQWebCSRF", keyTmp)
 				ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
 				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: s.Get("username")})
@@ -879,7 +917,7 @@ func main() {
 			app.Get("/api/status", func(ctx iris.Context) {
 				s := sess.Start(ctx)
 				salt := int(time.Now().Unix())
-				keyTmp := methods.Md5V(strconv.Itoa(salt + rand.Intn(100)))
+				keyTmp := utils.Md5V(strconv.Itoa(salt + rand.Intn(100)))
 				s.Set("OPQWebCSRF", keyTmp)
 				ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
 				if s.GetBooleanDefault("auth", false) {
@@ -895,7 +933,7 @@ func main() {
 				password := ctx.FormValue("password")
 				Config.Lock.RLock()
 				defer Config.Lock.RUnlock()
-				if username == Config.CoreConfig.OPQWebConfig.Username && password == methods.Md5V(Config.CoreConfig.OPQWebConfig.Password) {
+				if username == Config.CoreConfig.OPQWebConfig.Username && password == utils.Md5V(Config.CoreConfig.OPQWebConfig.Password) {
 					s := sess.Start(ctx)
 					s.Set("auth", true)
 					_, _ = ctx.JSON(WebResult{Code: 1, Info: "登录成功", Data: nil})
