@@ -2,7 +2,7 @@ package utils
 
 import "github.com/mcoo/requests"
 
-type Result struct {
+type DNSResult struct {
 	Code int `json:"code"`
 	Data struct {
 		Num86 []struct {
@@ -41,7 +41,7 @@ type Result struct {
 	} `json:"data"`
 }
 
-func DnsQuery(host string) (r Result, e error) {
+func DnsQuery(host string) (r DNSResult, e error) {
 	res, e := requests.Get("https://myssl.com/api/v1/tools/dns_query?qtype=1&qmode=-1&host=" + host)
 	if e != nil {
 		return
