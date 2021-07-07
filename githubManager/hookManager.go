@@ -2,11 +2,11 @@ package githubManager
 
 import (
 	"OPQBot-QQGroupManager/Config"
+	"OPQBot-QQGroupManager/Core"
 	"errors"
 	"fmt"
 	"github.com/go-playground/webhooks/v6/github"
 	"github.com/kataras/iris/v12"
-	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
 	"log"
 	"strings"
@@ -17,7 +17,7 @@ import (
 type Manager struct {
 	github     map[string]Config.Repo
 	githubLock sync.RWMutex
-	b          *OPQBot.BotManager
+	b          *Core.Bot
 }
 
 func (m *Manager) DelRepo(repo string, groupId int64) error {
@@ -77,7 +77,7 @@ func (m *Manager) AddRepo(repo string, Secret string, groupId int64) error {
 	return nil
 }
 
-func NewManager(app *iris.Application, bot *OPQBot.BotManager) Manager {
+func NewManager(app *iris.Application, bot *Core.Bot) Manager {
 	Config.Lock.RLock()
 	defer Config.Lock.RUnlock()
 	g := map[string]Config.Repo{}

@@ -44,6 +44,7 @@ type UserData struct {
 	LastSignDay int
 	LastZanDay  int
 	Count       int
+	SteamShare  string
 }
 type Job struct {
 	Cron    string
