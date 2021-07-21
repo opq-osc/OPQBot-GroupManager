@@ -6,6 +6,7 @@ import (
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/mcoo/OPQBot"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 var log = logrus.New()
@@ -49,6 +50,7 @@ type Bot struct {
 	OPQBot.BotManager
 	BotCronManager utils.BotCron
 	Modules        map[string]*Module
+	DB *gorm.DB
 }
 type ModuleInfo struct {
 	Name        string

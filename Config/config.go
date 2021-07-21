@@ -24,6 +24,15 @@ type CoreConfigStruct struct {
 		Url string
 		QQ  int64
 	}
+	DBConfig struct{
+		DBType string
+		DBUserName string
+		DBPassword string
+		DBIP string
+		DBPort string
+		DBName string
+	}
+	Debug              bool
 	BiliLive           bool
 	YiQing             bool
 	ReverseProxy       string
@@ -160,4 +169,5 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	dbInit()
 }

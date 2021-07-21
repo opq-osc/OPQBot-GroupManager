@@ -51,6 +51,7 @@ func main() {
 	}
 	b.BotCronManager = utils.NewBotCronManager()
 	b.BotCronManager.Start()
+	b.DB = Config.DB
 	err = b.AddEvent(OPQBot.EventNameOnConnected, func() {
 		log.Println("连接服务器成功")
 	})
