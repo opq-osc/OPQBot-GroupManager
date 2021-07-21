@@ -7,6 +7,13 @@ opqwebconfig:
 opqbotconfig:
     url: "http://127.0.0.1:8888"
     qq: 0
+dbconfig:
+    dbtype: "sqlite3"
+    dbusername: ""
+    dbpassword: ""
+    dbip: ""
+    dbport: ""
+    dbname: "data.db"
 reverseproxy: ""
 defaultgroupconfig:
     enable: true
