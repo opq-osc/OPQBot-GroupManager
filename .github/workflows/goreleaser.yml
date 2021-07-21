@@ -25,8 +25,8 @@ jobs:
         name: Build Web
         run: |
           npm install yarn -g
-          npm install -g @quasar/cli
-          chmod +x upx.sh;cd GroupManager/Web;yarn install;quasar build
+          yarn add -D @quasar/cli
+          chmod +x upx.sh;cd GroupManager/Web;yarn;yarn install;yarn quasar build
       -
         name: Set up Go
         uses: actions/setup-go@v2
