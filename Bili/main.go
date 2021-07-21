@@ -8,7 +8,7 @@ import (
 	"github.com/gaoyanpao/biliLiveHelper"
 	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
-	"log"
+	"github.com/sirupsen/logrus"
 	"strconv"
 	"strings"
 )
@@ -16,7 +16,18 @@ import (
 type Module struct {
 }
 
-func (m *Module) ModuleInit(b *Core.Bot) error {
+var log *logrus.Entry
+
+func (m *Module) ModuleInfo() Core.ModuleInfo {
+	return Core.ModuleInfo{
+		Name:        "Bili订阅姬",
+		Author:      "enjoy",
+		Description: "订阅bilibili番剧和UP",
+		Version:     0,
+	}
+}
+func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
+	log = l
 	bi := NewManager()
 	live := NewLiveManager()
 	b.BotCronManager.AddJob(-1, "Bili", "*/5 * * * *", func() {

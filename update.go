@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/mcoo/requests"
-	"log"
 	"runtime"
 	"strings"
 	"time"

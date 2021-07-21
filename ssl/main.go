@@ -6,13 +6,25 @@ import (
 	"OPQBot-QQGroupManager/utils"
 	"fmt"
 	"github.com/mcoo/OPQBot"
+	"github.com/sirupsen/logrus"
 	"strings"
 )
 
 type Module struct {
 }
 
-func (m *Module) ModuleInit(b *Core.Bot) error {
+var log *logrus.Entry
+
+func (m *Module) ModuleInfo() Core.ModuleInfo {
+	return Core.ModuleInfo{
+		Name:        "SSL扫描插件",
+		Author:      "enjoy",
+		Description: "",
+		Version:     0,
+	}
+}
+func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
+	log = l
 	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
 			return

@@ -34,6 +34,7 @@ type CoreConfigStruct struct {
 	GroupConfig        map[int64]GroupConfig
 	UserData           map[int64]UserData
 	GithubSub          map[string]Repo
+	LogLevel           string
 }
 type Repo struct {
 	Secret  string

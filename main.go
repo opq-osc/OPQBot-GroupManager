@@ -9,21 +9,36 @@ import (
 	"OPQBot-QQGroupManager/androidDns"
 	_ "OPQBot-QQGroupManager/genAndYiqin"
 	_ "OPQBot-QQGroupManager/githubManager"
+	"github.com/sirupsen/logrus"
+
 	//_ "OPQBot-QQGroupManager/steam"
 	"OPQBot-QQGroupManager/utils"
 
 	_ "github.com/go-playground/webhooks/v6/github"
 	"github.com/mcoo/OPQBot"
-
-	"log"
 )
 
 var (
 	version = "unknown"
 	date    = "none"
+	log     *logrus.Logger
 )
 
 func main() {
+	log = Core.GetLog()
+	if Config.CoreConfig.LogLevel != "" {
+		switch Config.CoreConfig.LogLevel {
+		case "info":
+			log.SetLevel(logrus.InfoLevel)
+		case "debug":
+			log.SetLevel(logrus.DebugLevel)
+		case "warn":
+			log.SetLevel(logrus.WarnLevel)
+		case "error":
+			log.SetLevel(logrus.ErrorLevel)
+		}
+
+	}
 	log.Println("QQ Group Manager -️" + version + " 编译时间 " + date)
 	androidDns.SetDns()
 	go CheckUpdate()
@@ -42,16 +57,11 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
+	_ = BanWord.Hook(&b)
+	Core.InitModule(&b)
 	err = b.Start()
 	if err != nil {
-		log.Println(err)
-	}
-	_ = BanWord.Hook(&b)
-	for _, v := range Core.Modules {
-		err := v.ModuleInit(&b)
-		if err != nil {
-			log.Println("导入模块时出错！", err)
-		}
+		log.Error(err)
 	}
 	b.Wait()
 }

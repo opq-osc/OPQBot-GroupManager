@@ -10,8 +10,8 @@ import (
 	"github.com/kataras/iris/v12"
 	"github.com/kataras/iris/v12/sessions"
 	"github.com/mcoo/OPQBot"
+	"github.com/sirupsen/logrus"
 	"io/fs"
-	"log"
 	"math/rand"
 	"net/http"
 	"net/http/httputil"
@@ -40,7 +40,18 @@ var (
 type Module struct {
 }
 
-func (m *Module) ModuleInit(b *Core.Bot) error {
+var log *logrus.Entry
+
+func (m *Module) ModuleInfo() Core.ModuleInfo {
+	return Core.ModuleInfo{
+		Name:        "群管理插件",
+		Author:      "enjoy",
+		Description: "",
+		Version:     0,
+	}
+}
+func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
+	log = l
 	VerifyNum := map[string]*struct {
 		Status bool
 		Code   string

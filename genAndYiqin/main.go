@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/sirupsen/logrus"
 
 	"github.com/mcoo/OPQBot"
 
@@ -88,8 +89,18 @@ type Logcation struct {
 	City     string `json:"city"`
 }
 
-func (m *Module) ModuleInit(b *Core.Bot) error {
+var log *logrus.Entry
 
+func (m *Module) ModuleInfo() Core.ModuleInfo {
+	return Core.ModuleInfo{
+		Name:        "梗查询和疫情订阅",
+		Author:      "bypanghu",
+		Description: "",
+		Version:     0,
+	}
+}
+func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
+	log = l
 	b.BotCronManager.AddJob(-1, "Yiqing", "* * 8,18 * * ? ", func() {
 		client := &http.Client{}
 		baseUrl := "https://m.sm.cn/api/rest?method=Huoshenshan.local"
@@ -197,7 +208,7 @@ func (m *Module) ModuleInit(b *Core.Bot) error {
 			ups += fmt.Sprintf("[表情145]全国累计治愈%s个昨日新增%s个\n", res.ContryData.CureCnt, res.ContryData.YstCureCnt)
 			ups += fmt.Sprintf("[表情66][表情66][表情66]疫情当下，请注意保护安全")
 			b.SendGroupTextMsg(packet.FromGroupID, fmt.Sprintf(ups))
-			fmt.Println(ups)
+			log.Println(ups)
 		}
 	})
 	if err != nil {

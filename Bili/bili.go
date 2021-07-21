@@ -4,7 +4,6 @@ import (
 	"OPQBot-QQGroupManager/Config"
 	"errors"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/mcoo/requests"

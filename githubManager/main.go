@@ -5,7 +5,7 @@ import (
 	"OPQBot-QQGroupManager/Core"
 	"OPQBot-QQGroupManager/GroupManager"
 	"fmt"
-	"log"
+	"github.com/sirupsen/logrus"
 
 	"github.com/mcoo/OPQBot"
 	"strings"
@@ -14,7 +14,18 @@ import (
 type Module struct {
 }
 
-func (m *Module) ModuleInit(b *Core.Bot) error {
+var log *logrus.Entry
+
+func (m *Module) ModuleInfo() Core.ModuleInfo {
+	return Core.ModuleInfo{
+		Name:        "Github订阅姬",
+		Author:      "enjoy",
+		Description: "",
+		Version:     0,
+	}
+}
+func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
+	log = l
 	g := NewManager(GroupManager.App, b)
 	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {

@@ -8,7 +8,6 @@ import (
 	"github.com/go-playground/webhooks/v6/github"
 	"github.com/kataras/iris/v12"
 	"github.com/mcoo/requests"
-	"log"
 	"strings"
 	"sync"
 	"time"
