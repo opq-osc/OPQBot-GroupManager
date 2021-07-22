@@ -16,6 +16,7 @@ type Manager struct {
 	fanjuMapLock *sync.RWMutex
 	r            *requests.Request
 }
+
 type SearchFanjuResult struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`

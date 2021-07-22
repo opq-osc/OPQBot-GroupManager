@@ -9,6 +9,7 @@ import (
 	"OPQBot-QQGroupManager/androidDns"
 	_ "OPQBot-QQGroupManager/genAndYiqin"
 	_ "OPQBot-QQGroupManager/githubManager"
+	_ "OPQBot-QQGroupManager/setu"
 	"github.com/sirupsen/logrus"
 
 	//_ "OPQBot-QQGroupManager/steam"

@@ -18,10 +18,11 @@ var log *logrus.Entry
 
 func (m *Module) ModuleInfo() Core.ModuleInfo {
 	return Core.ModuleInfo{
-		Name:        "Github订阅姬",
-		Author:      "enjoy",
-		Description: "",
-		Version:     0,
+		Name:          "Github订阅姬",
+		Author:        "enjoy",
+		Description:   "",
+		Version:       0,
+		RequireModule: []string{"群管理插件"},
 	}
 }
 func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {

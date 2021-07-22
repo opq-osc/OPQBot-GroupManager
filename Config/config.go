@@ -24,13 +24,17 @@ type CoreConfigStruct struct {
 		Url string
 		QQ  int64
 	}
-	DBConfig struct{
-		DBType string
+	DBConfig struct {
+		DBType     string
 		DBUserName string
 		DBPassword string
-		DBIP string
-		DBPort string
-		DBName string
+		DBIP       string
+		DBPort     string
+		DBName     string
+	}
+	SetuConfig struct {
+		PixivRefreshToken string
+		PixivProxy        string
 	}
 	Debug              bool
 	BiliLive           bool

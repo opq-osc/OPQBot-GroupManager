@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	DB   *gorm.DB
+	DB    *gorm.DB
 	sqlDb *sql.DB
 	//WithUps = SqlArg{ArgId: 1}
 	//WithJobs = SqlArg{ArgId: 2}
@@ -22,10 +22,10 @@ func dbInit() {
 	var err error
 	conn := ""
 	if CoreConfig.DBConfig.DBType == "mysql" {
-		conn = fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?parseTime=True&loc=Local", CoreConfig.DBConfig.DBUserName, CoreConfig.DBConfig.DBPassword,CoreConfig.DBConfig.DBIP,CoreConfig.DBConfig.DBPort, CoreConfig.DBConfig.DBName)
+		conn = fmt.Sprintf("%v:%v@tcp(%v:%v)/%v?parseTime=True&loc=Local", CoreConfig.DBConfig.DBUserName, CoreConfig.DBConfig.DBPassword, CoreConfig.DBConfig.DBIP, CoreConfig.DBConfig.DBPort, CoreConfig.DBConfig.DBName)
 		DB, err = gorm.Open(mysql.Open(conn), &gorm.Config{})
 	} else if CoreConfig.DBConfig.DBType == "sqlite3" {
-		conn = fmt.Sprintf("./%v.DB", CoreConfig.DBConfig.DBName)
+		conn = fmt.Sprintf("./%v.db", CoreConfig.DBConfig.DBName)
 		DB, err = gorm.Open(sqlite.Open(conn), &gorm.Config{})
 	} else {
 		panic(errors.New("not supported database adapter"))
