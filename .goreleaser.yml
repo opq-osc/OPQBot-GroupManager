@@ -13,10 +13,10 @@ builds:
       - linux
       - windows
       - darwin
-      - android
-    ignore:
-      - goos: android
-        goarch: 386
+#       - android
+#     ignore:
+#       - goos: android
+#         goarch: 386
     hooks:
       post: ./upx.sh {{ .Os }} {{ .Path }}
 archives:
