@@ -9,6 +9,7 @@ import (
 	"github.com/mcoo/requests"
 	"github.com/sirupsen/logrus"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -34,18 +35,37 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID != b.QQ {
 			cm := strings.Split(packet.Content, " ")
-			if len(cm) == 2 && cm[0] == "搜图测试" {
+			if len(cm) >= 2 && cm[0] == "搜图测试" {
 				pics, err := px.SearchPic(cm[1], false)
-				rand.Seed(time.Now().UnixNano())
-				num := rand.Intn(len(pics))
-				res, err := requests.Get(strings.ReplaceAll(pics[num].OriginalPicUrl, "i.pximg.net", "i.pixiv.cat"))
 				if err != nil {
 					log.Error(err)
 					return
 				}
-				b.SendGroupPicMsg(packet.FromGroupID, fmt.Sprintf("标题:%s", pics[num].Title), res.Content())
-				if err != nil {
-					log.Error(err)
+				if len(pics) == 0 {
+					b.SendGroupTextMsg(packet.FromGroupID, "没有找到有关"+cm[1]+"的图片")
+					return
+				}
+				getNum := 1
+				if len(cm) == 3 {
+					if count, err := strconv.Atoi(cm[2]); err != nil && count > 1 && count < 6 {
+						if len(pics) > count {
+							getNum = count
+						}
+					}
+				}
+
+				for i := 0; i < getNum; i++ {
+					rand.Seed(time.Now().UnixNano())
+					num := rand.Intn(len(pics))
+					res, err := requests.Get(strings.ReplaceAll(pics[num].OriginalPicUrl, "i.pximg.net", "i.pixiv.cat"))
+					if err != nil {
+						log.Error(err)
+						return
+					}
+					b.SendGroupPicMsg(packet.FromGroupID, fmt.Sprintf("标题:%s", pics[num].Title), res.Content())
+					if err != nil {
+						log.Error(err)
+					}
 				}
 
 			}
