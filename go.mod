@@ -13,6 +13,7 @@ require (
 	github.com/kataras/iris/v12 v12.2.0-alpha2.0.20210427211137-fa175eb84754
 	github.com/mcoo/OPQBot v0.1.3-0.20210721042534-b725701428cd
 	github.com/mcoo/requests v0.0.2
+	github.com/mcoo/sqlite v1.1.4-fix-1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/smartystreets/goconvey v1.6.4 // indirect
@@ -20,6 +21,5 @@ require (
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	gorm.io/driver/mysql v1.1.1
-	gorm.io/driver/sqlite v1.1.4
 	gorm.io/gorm v1.21.11
 )

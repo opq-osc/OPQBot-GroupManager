@@ -8,15 +8,15 @@ before:
     - go generate ./...
 builds:
   - env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     goos:
       - linux
       - windows
       - darwin
-#       - android
-#     ignore:
-#       - goos: android
-#         goarch: 386
+      - android
+    ignore:
+      - goos: android
+        goarch: 386
     hooks:
       post: ./upx.sh {{ .Os }} {{ .Path }}
 archives:
