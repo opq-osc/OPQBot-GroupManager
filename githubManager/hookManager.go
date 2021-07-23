@@ -133,7 +133,7 @@ func NewManager(app *iris.Application, bot *Core.Bot) Manager {
 		case github.PushPayload:
 			var commitString []string
 			for _, v1 := range v.Commits {
-				t, err := time.Parse("2006-01-02T15:04:05-0700", v1.Timestamp)
+				t, err := time.Parse("2006-01-02T15:04:05-07:00", v1.Timestamp)
 				if err != nil {
 					log.Println(err)
 					commitString = append(commitString, fmt.Sprintf("[%s] %s", v1.Timestamp, v1.Message))
