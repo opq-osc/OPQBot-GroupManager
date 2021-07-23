@@ -4,11 +4,13 @@ import (
 	"OPQBot-QQGroupManager/Core"
 	"OPQBot-QQGroupManager/setu/pixiv"
 	"OPQBot-QQGroupManager/setu/setucore"
+	"encoding/base64"
 	"fmt"
 	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
 	"github.com/sirupsen/logrus"
-	"math/rand"
+	"gorm.io/gorm"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +19,9 @@ import (
 type Module struct {
 }
 
-var log *logrus.Entry
+var (
+	log *logrus.Entry
+)
 
 func (m *Module) ModuleInfo() Core.ModuleInfo {
 	return Core.ModuleInfo{
@@ -31,12 +35,25 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
 	InitDB(b.DB)
 	px := &pixiv.Provider{}
-	RegisterProvider(px, b)
+	RegisterProvider(px, b, b.DB)
 	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID != b.QQ {
-			cm := strings.Split(packet.Content, " ")
-			if len(cm) >= 2 && cm[0] == "搜图测试" {
-				pics, err := px.SearchPic(cm[1], false)
+			//cm := strings.Split(packet.Content, " ")
+			cm := strings.SplitN(packet.Content, " ", 2)
+			command, _ := regexp.Compile("搜([0-9]+)张图")
+			if len(cm) >= 2 && command.MatchString(cm[0]) {
+				getNum := 1
+				tmp := command.FindStringSubmatch(cm[0])
+				if len(tmp) == 2 {
+					if count, err := strconv.Atoi(tmp[1]); err == nil && count > 1 {
+						getNum = count
+						if count > 10 {
+							getNum = 10
+						}
+					}
+				}
+
+				pics, err := px.SearchPic(cm[1], false, getNum)
 				if err != nil {
 					log.Error(err)
 					return
@@ -45,24 +62,29 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					b.SendGroupTextMsg(packet.FromGroupID, "没有找到有关"+cm[1]+"的图片")
 					return
 				}
-				getNum := 1
-				if len(cm) == 3 {
-					if count, err := strconv.Atoi(cm[2]); err != nil && count > 1 && count < 6 {
-						if len(pics) > count {
-							getNum = count
-						}
-					}
-				}
 
-				for i := 0; i < getNum; i++ {
-					rand.Seed(time.Now().UnixNano())
-					num := rand.Intn(len(pics))
-					res, err := requests.Get(strings.ReplaceAll(pics[num].OriginalPicUrl, "i.pximg.net", "i.pixiv.cat"))
+				for _, v := range pics {
+					res, err := requests.Get(strings.ReplaceAll(v.OriginalPicUrl, "i.pximg.net", "i-cf.pximg.net"), requests.Header{"referer": "https://www.pixiv.net/"})
 					if err != nil {
 						log.Error(err)
 						return
 					}
-					b.SendGroupPicMsg(packet.FromGroupID, fmt.Sprintf("标题:%s", pics[num].Title), res.Content())
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypeGroup,
+						ToUserUid:  packet.FromGroupID,
+						Content: OPQBot.SendTypePicMsgByBase64Content{
+							Content: fmt.Sprintf("标题:%s\n30s自动撤回\n%s", v.Title, OPQBot.MacroId()),
+							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
+							Flash:   false,
+						},
+						CallbackFunc: func(Code int, Info string, record OPQBot.MyRecord) {
+							time.Sleep(30 * time.Second)
+							err := b.ReCallMsg(packet.FromGroupID, record.MsgRandom, record.MsgSeq)
+							if err != nil {
+								log.Warn(err)
+							}
+						},
+					})
 					if err != nil {
 						log.Error(err)
 					}
@@ -79,6 +101,6 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 func init() {
 	Core.RegisterModule(&Module{})
 }
-func RegisterProvider(p setucore.Provider, bot *Core.Bot) {
-	p.InitProvider(log.WithField("SetuProvider", "Pixiv Core"), bot)
+func RegisterProvider(p setucore.Provider, bot *Core.Bot, db *gorm.DB) {
+	p.InitProvider(log.WithField("SetuProvider", "Pixiv Core"), bot, db)
 }

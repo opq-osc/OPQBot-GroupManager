@@ -76,6 +76,7 @@ func startModule(b *Bot, module Module) error {
 }
 func RegisterModule(module Module) error {
 	if _, ok := Modules[module.ModuleInfo().Name]; ok {
+		log.Error(module.ModuleInfo().Name + "模块名字已经被注册了")
 		return errors.New(module.ModuleInfo().Name + "模块名字已经被注册了")
 	} else {
 		Modules[module.ModuleInfo().Name] = module

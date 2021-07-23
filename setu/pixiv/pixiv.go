@@ -12,6 +12,7 @@ import (
 	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 	"strings"
 	"time"
 )
@@ -26,15 +27,23 @@ var (
 )
 
 type Provider struct {
-	c Client
+	c  Client
+	db *gorm.DB
 }
 
-func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot) {
+func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 	log = l
+	db.AutoMigrate(&setucore.Pic{})
 	Config.Lock.RLock()
+	debug := Config.CoreConfig.Debug
 	p.c.Proxy = Config.CoreConfig.SetuConfig.PixivProxy
 	p.c.refreshToken = Config.CoreConfig.SetuConfig.PixivRefreshToken
 	Config.Lock.RUnlock()
+
+	p.db = db
+	if debug {
+		p.db = p.db.Debug()
+	}
 	if p.c.refreshToken == "" {
 		p.c.GenerateLoginUrl()
 	} else {
@@ -63,44 +72,81 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot) {
 		log.Error(err)
 	}
 }
-func (p *Provider) SearchPic(word string, r18 bool) ([]setucore.Pic, error) {
-	result, err := p.c.SearchIllust(word)
+func (p *Provider) SearchPicFromDB(word string, r18 bool, num int) (pics []setucore.Pic, e error) {
+	e = p.db.Where("tag LIKE ? AND r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Find(&pics).Error
+	return
+}
+func (p *Provider) AddPicToDB(pic setucore.Pic) error {
+	var num int64
+	p.db.Model(&pic).Where("id = ?", pic.Id).Count(&num)
+	if num > 0 {
+		return errors.New("图片数据库已存在！")
+	}
+	return p.db.Create(&pic).Error
+}
+func (p *Provider) SetPicSendTime(pics []setucore.Pic) {
+	var sendPicId []int
+	for _, v := range pics {
+		sendPicId = append(sendPicId, v.Id)
+	}
+	p.db.Model(&setucore.Pic{}).Where("id IN ?", sendPicId).Updates(&setucore.Pic{LastSendTime: time.Now().Unix()})
+}
+func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, error) {
+	dbPic, err := p.SearchPicFromDB(word, r18, num)
 	if err != nil {
+		log.Warn(err)
 		return nil, err
 	}
-	var pic []setucore.Pic
-	for _, v := range result.Illusts {
-		if !r18 && v.XRestrict >= 1 {
-			continue
+	if len(dbPic) < num {
+		log.Info("本地数据库数据量不够，联网下载中")
+		result, err := p.c.SearchIllust(word)
+		if err != nil {
+			log.Warn(err)
 		}
-		var tag []string
-		for _, v1 := range v.Tags {
-			tmp := ""
-			if v1.TranslatedName != "" {
-				tmp = v1.TranslatedName
+		for _, v := range result.Illusts {
+			originPicUrl := ""
+			if v.PageCount == 1 {
+				originPicUrl = v.MetaSinglePage.OriginalImageURL
 			} else {
-				tmp = v1.Name
+				originPicUrl = v.MetaPages[0].ImageUrls.Original
 			}
-			tag = append(tag, tmp)
+			var tag []string
+			tagHasR18 := false
+			for _, v1 := range v.Tags {
+				tmp := ""
+				if v1.TranslatedName != "" {
+					tmp = v1.TranslatedName
+				} else {
+					tmp = v1.Name
+				}
+				if tmp == "R18" || tmp == "R-18" {
+					tagHasR18 = true
+				}
+				tag = append(tag, tmp)
+			}
+			tmp := setucore.Pic{
+				Id:             v.ID,
+				Title:          v.Title,
+				Author:         v.User.Name,
+				AuthorID:       v.User.ID,
+				OriginalPicUrl: originPicUrl,
+				Tag:            strings.Join(tag, ","),
+				R18:            v.XRestrict >= 1 || tagHasR18,
+			}
+			err := p.AddPicToDB(tmp)
+			if err != nil {
+				log.Warn(err)
+			}
 		}
-		originPicUrl := ""
-		if v.PageCount == 1 {
-			originPicUrl = v.MetaSinglePage.OriginalImageURL
-		} else {
-			originPicUrl = v.MetaPages[0].ImageUrls.Original
+		dbPic, err = p.SearchPicFromDB(word, r18, num)
+		if err != nil {
+			log.Warn(err)
+			return nil, err
 		}
-		tmp := setucore.Pic{
-			Id:             v.ID,
-			Title:          v.Title,
-			Author:         v.User.Name,
-			AuthorID:       v.User.ID,
-			OriginalPicUrl: originPicUrl,
-			Tag:            strings.Join(tag, ","),
-			R18:            v.XRestrict >= 1,
-		}
-		pic = append(pic, tmp)
 	}
-	return pic, nil
+
+	p.SetPicSendTime(dbPic)
+	return dbPic, nil
 }
 
 type Client struct {
