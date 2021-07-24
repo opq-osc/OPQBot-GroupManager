@@ -26,6 +26,7 @@ jobs:
         run: |
           npm config set registry https://registry.npmjs.org
           npm install yarn -g
+          yarn config set registry https://registry.yarnpkg.com
           npm install -g @quasar/cli
           chmod +x upx.sh;cd GroupManager/Web;yarn install;quasar build
       -
