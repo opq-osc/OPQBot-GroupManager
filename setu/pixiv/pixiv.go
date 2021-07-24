@@ -73,14 +73,14 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 	}
 }
 func (p *Provider) SearchPicFromDB(word string, r18 bool, num int) (pics []setucore.Pic, e error) {
-	e = p.db.Where("tag LIKE ? AND r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Find(&pics).Error
+	e = p.db.Where("tag LIKE ? AND r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
 	return
 }
 func (p *Provider) AddPicToDB(pic setucore.Pic) error {
 	var num int64
 	p.db.Model(&pic).Where("id = ?", pic.Id).Count(&num)
 	if num > 0 {
-		return errors.New("图片数据库已存在！")
+		return errors.New("该图片在数据库中已存在！")
 	}
 	return p.db.Create(&pic).Error
 }
@@ -98,11 +98,12 @@ func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, er
 		return nil, err
 	}
 	if len(dbPic) < num {
-		log.Info("本地数据库数据量不够，联网下载中")
+		log.Info("本地数据库数据量不够，联网获取中...")
 		result, err := p.c.SearchIllust(word)
 		if err != nil {
 			log.Warn(err)
 		}
+		addPicNum := 0
 		for _, v := range result.Illusts {
 			originPicUrl := ""
 			if v.PageCount == 1 {
@@ -135,17 +136,21 @@ func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, er
 			}
 			err := p.AddPicToDB(tmp)
 			if err != nil {
-				log.Warn(err)
+				//log.Warn(err)
+				continue
 			}
+			addPicNum += 1
 		}
+		log.Info("联网添加到本地数据库数据关于", word, "的记录数量为:", addPicNum)
 		dbPic, err = p.SearchPicFromDB(word, r18, num)
 		if err != nil {
 			log.Warn(err)
 			return nil, err
 		}
 	}
-
-	p.SetPicSendTime(dbPic)
+	if len(dbPic) > 0 {
+		p.SetPicSendTime(dbPic)
+	}
 	return dbPic, nil
 }
 

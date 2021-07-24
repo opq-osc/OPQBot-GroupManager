@@ -10,6 +10,7 @@ import (
 	_ "OPQBot-QQGroupManager/genAndYiqin"
 	_ "OPQBot-QQGroupManager/githubManager"
 	_ "OPQBot-QQGroupManager/setu"
+	_ "OPQBot-QQGroupManager/wordCloud"
 	"github.com/sirupsen/logrus"
 
 	//_ "OPQBot-QQGroupManager/steam"

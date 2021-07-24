@@ -73,7 +73,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 						SendToType: OPQBot.SendToTypeGroup,
 						ToUserUid:  packet.FromGroupID,
 						Content: OPQBot.SendTypePicMsgByBase64Content{
-							Content: fmt.Sprintf("标题:%s\n30s自动撤回\n%s", v.Title, OPQBot.MacroId()),
+							Content: fmt.Sprintf("标题:%s\n作者:%s\n作品链接:%s\n原图链接:%s\n30s自动撤回\n%s", v.Title, v.Author, "www.pixiv.net/artworks/"+strconv.Itoa(v.Id), v.OriginalPicUrl, OPQBot.MacroId()),
 							Base64:  base64.StdEncoding.EncodeToString(res.Content()),
 							Flash:   false,
 						},

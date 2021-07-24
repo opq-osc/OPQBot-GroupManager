@@ -9,6 +9,10 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
+    goarch:
+      - amd64
+      - arm
+      - arm64
     goos:
       - linux
       - windows
@@ -35,6 +39,8 @@ archives:
       - config.yaml.example
       - LICENSE
       - README.md
+      - font.ttf
+      - dictionary.txt
 release:
   prerelease: auto
 checksum:
