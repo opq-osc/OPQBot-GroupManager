@@ -23,7 +23,7 @@ builds:
       - darwin
       - android
     ignore:
-      - goos: androud
+      - goos: android
         goarch: arm
       - goos: darwin
         goarch: 386
