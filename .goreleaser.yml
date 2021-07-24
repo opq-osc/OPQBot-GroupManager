@@ -19,6 +19,8 @@ builds:
       - darwin
       - android
     ignore:
+      - goos: darwin
+        goarch: arm
       - goos: android
         goarch: 386
     hooks:
