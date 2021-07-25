@@ -956,6 +956,10 @@ func beforeCsrf(ctx iris.Context) {
 			ctx.Next()
 		} else {
 			// log.Println(key, "-", ctx.FormValue("csrfToken"))
+			if strings.HasPrefix(ctx.Path(), "/github/webhook") {
+				ctx.Next()
+				return
+			}
 			ctx.StatusCode(419)
 			_, _ = ctx.JSON(WebResult{Code: 419, Info: "CSRF Error!", Data: nil})
 			return
