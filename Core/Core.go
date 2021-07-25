@@ -1,6 +1,7 @@
 package Core
 
 import (
+	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/utils"
 	"errors"
 	"fmt"
@@ -75,6 +76,15 @@ func startModule(b *Bot, module Module) error {
 	return nil
 }
 func RegisterModule(module Module) error {
+	Config.Lock.RLock()
+	disable := Config.CoreConfig.DisableModule
+	Config.Lock.RUnlock()
+	for _, v := range disable {
+		if v == module.ModuleInfo().Name {
+			log.Warn(module.ModuleInfo().Name + "模块已被禁止载入")
+			return errors.New("模块已被禁止载入")
+		}
+	}
 	if _, ok := Modules[module.ModuleInfo().Name]; ok {
 		log.Error(module.ModuleInfo().Name + "模块名字已经被注册了")
 		return errors.New(module.ModuleInfo().Name + "模块名字已经被注册了")

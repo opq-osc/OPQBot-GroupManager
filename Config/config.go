@@ -32,9 +32,11 @@ type CoreConfigStruct struct {
 		DBName     string
 	}
 	SetuConfig struct {
+		AutoGetPic        bool
 		PixivRefreshToken string
 		PixivProxy        string
 	}
+	DisableModule      []string
 	BanQQ              []int64
 	Debug              bool
 	BiliLive           bool

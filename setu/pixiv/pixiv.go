@@ -31,6 +31,52 @@ type Provider struct {
 	db *gorm.DB
 }
 
+func (p *Provider) autoGetPic() {
+	log.Info("自动获取Pixiv图片排行榜")
+	result, err := p.c.GetDailyIllust()
+	if err != nil {
+		log.Warn(err)
+	}
+	addPicNum := 0
+	for _, v := range result.Illusts {
+		originPicUrl := ""
+		if v.PageCount == 1 {
+			originPicUrl = v.MetaSinglePage.OriginalImageURL
+		} else {
+			originPicUrl = v.MetaPages[0].ImageUrls.Original
+		}
+		var tag []string
+		tagHasR18 := false
+		for _, v1 := range v.Tags {
+			tmp := ""
+			if v1.TranslatedName != "" {
+				tmp = v1.TranslatedName
+			} else {
+				tmp = v1.Name
+			}
+			if tmp == "R18" || tmp == "R-18" {
+				tagHasR18 = true
+			}
+			tag = append(tag, tmp)
+		}
+		tmp := setucore.Pic{
+			Id:             v.ID,
+			Title:          v.Title,
+			Author:         v.User.Name,
+			AuthorID:       v.User.ID,
+			OriginalPicUrl: originPicUrl,
+			Tag:            strings.Join(tag, ","),
+			R18:            v.XRestrict >= 1 || tagHasR18,
+		}
+		err := p.AddPicToDB(tmp)
+		if err != nil {
+			//log.Warn(err)
+			continue
+		}
+		addPicNum += 1
+	}
+	log.Info("联网添加到本地数据库数据图片数量为:", addPicNum)
+}
 func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 	log = l
 	db.AutoMigrate(&setucore.Pic{})
@@ -38,8 +84,8 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 	debug := Config.CoreConfig.Debug
 	p.c.Proxy = Config.CoreConfig.SetuConfig.PixivProxy
 	p.c.refreshToken = Config.CoreConfig.SetuConfig.PixivRefreshToken
+	autoGetPic := Config.CoreConfig.SetuConfig.AutoGetPic
 	Config.Lock.RUnlock()
-
 	p.db = db
 	if debug {
 		p.db = p.db.Debug()
@@ -52,7 +98,14 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 			log.Error(err)
 		}
 	}
-
+	if autoGetPic {
+		err := b.BotCronManager.AddJob(-1, "setuAuto", "0 8 * * *", func() {
+			p.autoGetPic()
+		})
+		if err != nil {
+			log.Error(err)
+		}
+	}
 	err := b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
 		if packet.FromUin != b.QQ {
 			if strings.HasPrefix(packet.Content, "code=") && !p.c.Login {
@@ -73,6 +126,10 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 	}
 }
 func (p *Provider) SearchPicFromDB(word string, r18 bool, num int) (pics []setucore.Pic, e error) {
+	if word == "" {
+		e = p.db.Where("r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
+		return
+	}
 	e = p.db.Where("tag LIKE ? AND r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
 	return
 }
@@ -320,13 +377,13 @@ func (c *Client) SearchIllust(word string) (result IllustResult, err error) {
 	err = res.Json(&result)
 	return
 }
-func (c *Client) GetWeeklyIllust() (result IllustResult, err error) {
+func (c *Client) GetDailyIllust() (result IllustResult, err error) {
 	var res *requests.Response
 	req := requests.Requests()
 	if c.Proxy != "" {
 		req.Proxy(c.Proxy)
 	}
-	res, err = req.Get("https://app-api.pixiv.net/v1/illust/ranking?mode=week_rookie&filter=for_ios", c.GetHeader())
+	res, err = req.Get("https://app-api.pixiv.net/v1/illust/ranking?mode=day&filter=for_ios", c.GetHeader())
 	if err != nil {
 		return
 	}
