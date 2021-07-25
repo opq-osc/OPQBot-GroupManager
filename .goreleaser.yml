@@ -9,16 +9,30 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
+    goarm:
+      - 6
+      - 7
     goarch:
       - amd64
       - arm
       - arm64
+      - 386
     goos:
       - linux
       - windows
       - darwin
       - android
     ignore:
+      - goos: android
+        goarch: arm
+      - goos: darwin
+        goarch: 386
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
       - goos: android
         goarch: 386
     hooks:
