@@ -11,8 +11,10 @@ import (
 	_ "OPQBot-QQGroupManager/githubManager"
 	_ "OPQBot-QQGroupManager/setu"
 	_ "OPQBot-QQGroupManager/wordCloud"
+	"fmt"
 	"github.com/sirupsen/logrus"
-
+	"net/http"
+	_ "net/http/pprof"
 	//_ "OPQBot-QQGroupManager/steam"
 	"OPQBot-QQGroupManager/utils"
 
@@ -39,6 +41,15 @@ func main() {
 		case "error":
 			log.SetLevel(logrus.ErrorLevel)
 		}
+
+	}
+	if Config.CoreConfig.Debug {
+		go func() {
+			ip := ":25569"
+			if err := http.ListenAndServe(ip, nil); err != nil {
+				fmt.Printf("start pprof failed on %s\n", ip)
+			}
+		}()
 
 	}
 	log.Println("QQ Group Manager -️" + version + " 编译时间 " + date)

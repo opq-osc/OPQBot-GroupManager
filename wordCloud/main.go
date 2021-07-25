@@ -3,14 +3,13 @@ package wordCloud
 import (
 	"OPQBot-QQGroupManager/Core"
 	"bytes"
-	"github.com/huichen/sego"
+	"github.com/go-ego/gse"
 	"github.com/mcoo/OPQBot"
 	"github.com/psykhi/wordclouds"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"image/color"
 	"image/png"
-	"strings"
 	"time"
 )
 
@@ -20,6 +19,10 @@ var DefaultColors = []color.RGBA{
 	{0x59, 0x3a, 0xee, 0xff},
 	{0x65, 0xCD, 0xFA, 0xff},
 	{0x70, 0xD6, 0xBF, 0xff},
+	{153, 50, 204, 255},
+	{100, 149, 237, 255},
+	{0, 255, 127, 255},
+	{255, 0, 0, 255},
 }
 
 type Module struct {
@@ -49,20 +52,24 @@ type HotWord struct {
 }
 
 func (m *Module) DoHotWord() {
-	var segmented sego.Segmenter
-	segmented.LoadDictionary("./dictionary.txt")
+	var segmenter gse.Segmenter
+	err := segmenter.LoadDict("./dictionary.txt")
+	if err != nil {
+		log.Error(err)
+	}
+	//var segmented sego.Segmenter
+	//segmented.LoadDictionary("./dictionary.txt")
 	for {
 		msg := <-m.MsgChannel
-		split := strings.Split(sego.SegmentsToString(segmented.Segment([]byte(msg.Content)), false), " ")
-		for _, v := range split {
-			if s := strings.Split(v, "/"); len(s) == 2 && (len(s[0]) > 1) {
-				err := m.AddHotWord(s[0], msg.FromGroupID)
+		tmp := segmenter.Segment([]byte(msg.Content))
+		for _, v := range gse.ToSlice(tmp, false) {
+			if len([]rune(v)) > 1 {
+				err := m.AddHotWord(v, msg.FromGroupID)
 				if err != nil {
 					log.Error(err)
 				}
 			}
 		}
-
 	}
 }
 
@@ -86,9 +93,12 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					log.Error(err)
 					return
 				}
-				sendMsg := "今日本群词云\n"
+				sendMsg := "今日本群词云"
 				hotMap := map[string]int{}
 				for i := 0; i < len(hotWords); i++ {
+					if len([]rune(hotWords[i].Word)) <= 1 {
+						continue
+					}
 					hotMap[hotWords[i].Word] = hotWords[i].Count
 				}
 				log.Info(hotMap)
@@ -97,10 +107,41 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					colors = append(colors, c)
 				}
 
-				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(128), wordclouds.FontMinSize(60), wordclouds.FontFile("./font.ttf"),
+				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(150), wordclouds.FontMinSize(20), wordclouds.FontFile("./font.ttf"),
 					wordclouds.Height(1024),
 					wordclouds.Width(2048), wordclouds.Colors(colors)).Draw()
 
+				buf := new(bytes.Buffer)
+				err = png.Encode(buf, img)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				b.SendGroupPicMsg(packet.FromGroupID, sendMsg, buf.Bytes())
+			}
+			if packet.Content == "本周词云" {
+				hotWords, err := m.GetWeeklyWord(packet.FromGroupID)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				sendMsg := "本周词云"
+				hotMap := map[string]int{}
+				for i := 0; i < len(hotWords); i++ {
+					if len([]rune(hotWords[i].Word)) <= 1 {
+						continue
+					}
+					hotMap[hotWords[i].Word] = hotWords[i].Count
+				}
+				log.Info(hotMap)
+				colors := make([]color.Color, 0)
+				for _, c := range DefaultColors {
+					colors = append(colors, c)
+				}
+
+				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(150), wordclouds.FontMinSize(20), wordclouds.FontFile("./font.ttf"),
+					wordclouds.Height(1024),
+					wordclouds.Width(2048), wordclouds.Colors(colors)).Draw()
 				buf := new(bytes.Buffer)
 				err = png.Encode(buf, img)
 				if err != nil {

@@ -20,7 +20,16 @@ func Hook(b *Core.Bot) error {
 		} else {
 			c = Config.CoreConfig.DefaultGroupConfig
 		}
+		banQQ := Config.CoreConfig.BanQQ
 		Config.Lock.RUnlock()
+
+		for _, v := range banQQ {
+			if packet.FromUserID == v {
+				packet.Ban = true
+				return
+			}
+		}
+
 		if !c.Enable {
 			return
 		}

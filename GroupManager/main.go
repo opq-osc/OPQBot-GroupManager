@@ -323,332 +323,158 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 
 	if Config.CoreConfig.OPQWebConfig.Enable {
 		log.Println("启动Web 😊")
-		go func() {
-			Config.Lock.Lock()
-			sess = sessions.New(sessions.Config{Cookie: "OPQWebSession"})
-			if Config.CoreConfig.OPQWebConfig.CSRF == "" {
-				Config.CoreConfig.OPQWebConfig.CSRF = utils.RandomString(32)
-				err := Config.Save()
-				if err != nil {
-					log.Println(err)
-				}
+
+		Config.Lock.Lock()
+		sess = sessions.New(sessions.Config{Cookie: "OPQWebSession"})
+		if Config.CoreConfig.OPQWebConfig.CSRF == "" {
+			Config.CoreConfig.OPQWebConfig.CSRF = utils.RandomString(32)
+			err := Config.Save()
+			if err != nil {
+				log.Println(err)
 			}
-			fads, _ := fs.Sub(staticFs, "Web/dist/spa")
-			if Config.CoreConfig.ReverseProxy != "" {
-				// target, err := url.Parse(Config.CoreConfig.ReverseProxy)
-				if err != nil {
-					panic(err)
+		}
+		fads, _ := fs.Sub(staticFs, "Web/dist/spa")
+		if Config.CoreConfig.ReverseProxy != "" {
+			// target, err := url.Parse(Config.CoreConfig.ReverseProxy)
+			if err != nil {
+				panic(err)
+			}
+			App.Get("{root:path}", func(ctx iris.Context) {
+				director := func(r *http.Request) {
+					r.Host = Config.CoreConfig.ReverseProxy
+					r.URL, _ = url.Parse(r.Host + "/" + ctx.Path())
 				}
-				App.Get("{root:path}", func(ctx iris.Context) {
-					director := func(r *http.Request) {
-						r.Host = Config.CoreConfig.ReverseProxy
-						r.URL, _ = url.Parse(r.Host + "/" + ctx.Path())
-					}
-					p := &httputil.ReverseProxy{Director: director}
-					p.ServeHTTP(ctx.ResponseWriter(), ctx.Request())
-				})
+				p := &httputil.ReverseProxy{Director: director}
+				p.ServeHTTP(ctx.ResponseWriter(), ctx.Request())
+			})
+		} else {
+			App.HandleDir("/", http.FS(fads))
+		}
+
+		// app.HandleDir("/", iris.Dir("./Web/dist/spa"))
+		Config.Lock.Unlock()
+
+		App.Use(beforeCsrf)
+		App.Use(sess.Handler())
+		App.WrapRouter(func(w http.ResponseWriter, r *http.Request, router http.HandlerFunc) {
+			w.Header().Add("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+			w.Header().Add("Access-Control-Allow-Credentials", "true")
+			path := r.URL.Path
+			if r.Method == "OPTIONS" {
+				w.Header().Add("Access-Control-Allow-Headers", "content-type")
+				w.WriteHeader(200)
+				return
+			}
+			if len(path) < 4 {
+				if !pathIsFile(path) {
+					r.URL.Path = "/"
+				}
 			} else {
-				App.HandleDir("/", http.FS(fads))
-			}
-
-			// app.HandleDir("/", iris.Dir("./Web/dist/spa"))
-			Config.Lock.Unlock()
-
-			App.Use(beforeCsrf)
-			App.Use(sess.Handler())
-			App.WrapRouter(func(w http.ResponseWriter, r *http.Request, router http.HandlerFunc) {
-				w.Header().Add("Access-Control-Allow-Origin", r.Header.Get("Origin"))
-				w.Header().Add("Access-Control-Allow-Credentials", "true")
-				path := r.URL.Path
-				if r.Method == "OPTIONS" {
-					w.Header().Add("Access-Control-Allow-Headers", "content-type")
-					w.WriteHeader(200)
-					return
-				}
-				if len(path) < 4 {
+				if r.URL.Path[0:4] != "/api" && r.URL.Path[0:4] != "/git" {
 					if !pathIsFile(path) {
 						r.URL.Path = "/"
 					}
-				} else {
-					if r.URL.Path[0:4] != "/api" && r.URL.Path[0:4] != "/git" {
-						if !pathIsFile(path) {
-							r.URL.Path = "/"
-						}
-					}
 				}
-				// log.Println(r.URL.Path)
-				router.ServeHTTP(w, r)
-			})
-			App.Get("/api/csrf", func(ctx iris.Context) {
-				s := sess.Start(ctx)
-				salt := int(time.Now().Unix())
-				keyTmp := utils.Md5V(strconv.Itoa(salt + rand.Intn(100)))
-				s.Set("OPQWebCSRF", keyTmp)
-				ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
-				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: s.Get("username")})
-			})
-			App.Get("/api/status", func(ctx iris.Context) {
-				s := sess.Start(ctx)
-				salt := int(time.Now().Unix())
-				keyTmp := utils.Md5V(strconv.Itoa(salt + rand.Intn(100)))
-				s.Set("OPQWebCSRF", keyTmp)
-				ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
-				if s.GetBooleanDefault("auth", false) {
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "已登录!", Data: s.Get("username")})
-					return
-				} else {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: "未登录!", Data: nil})
-					return
-				}
-			})
-			App.Post("/api/login", func(ctx iris.Context) {
-				username := ctx.FormValue("username")
-				password := ctx.FormValue("password")
-				Config.Lock.RLock()
-				defer Config.Lock.RUnlock()
-				if username == Config.CoreConfig.OPQWebConfig.Username && password == utils.Md5V(Config.CoreConfig.OPQWebConfig.Password) {
-					s := sess.Start(ctx)
-					s.Set("auth", true)
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "登录成功", Data: nil})
-					return
-				} else {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: "用户名密码错误!", Data: nil})
-					return
-				}
-
-			})
-			// job周期任务读取
+			}
+			// log.Println(r.URL.Path)
+			router.ServeHTTP(w, r)
+		})
+		App.Get("/api/csrf", func(ctx iris.Context) {
+			s := sess.Start(ctx)
+			salt := int(time.Now().Unix())
+			keyTmp := utils.Md5V(strconv.Itoa(salt + rand.Intn(100)))
+			s.Set("OPQWebCSRF", keyTmp)
+			ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
+			_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: s.Get("username")})
+		})
+		App.Get("/api/status", func(ctx iris.Context) {
+			s := sess.Start(ctx)
+			salt := int(time.Now().Unix())
+			keyTmp := utils.Md5V(strconv.Itoa(salt + rand.Intn(100)))
+			s.Set("OPQWebCSRF", keyTmp)
+			ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
+			if s.GetBooleanDefault("auth", false) {
+				_, _ = ctx.JSON(WebResult{Code: 1, Info: "已登录!", Data: s.Get("username")})
+				return
+			} else {
+				_, _ = ctx.JSON(WebResult{Code: 0, Info: "未登录!", Data: nil})
+				return
+			}
+		})
+		App.Post("/api/login", func(ctx iris.Context) {
+			username := ctx.FormValue("username")
+			password := ctx.FormValue("password")
 			Config.Lock.RLock()
-			for k, v := range Config.CoreConfig.GroupConfig {
-				for k1, v2 := range v.Job {
-					switch v2.Type {
-					case 1:
-						err = b.BotCronManager.AddJob(k, k1, v2.Cron, func() {
-							log.Print("执行任务" + k1)
-							if b.Announce(v2.Title, v2.Content, 0, 10, k) != nil {
-								log.Print(err)
-							}
-						})
-						if err != nil {
-							log.Print("添加任务" + k1 + "出现错误" + err.Error())
+			defer Config.Lock.RUnlock()
+			if username == Config.CoreConfig.OPQWebConfig.Username && password == utils.Md5V(Config.CoreConfig.OPQWebConfig.Password) {
+				s := sess.Start(ctx)
+				s.Set("auth", true)
+				_, _ = ctx.JSON(WebResult{Code: 1, Info: "登录成功", Data: nil})
+				return
+			} else {
+				_, _ = ctx.JSON(WebResult{Code: 0, Info: "用户名密码错误!", Data: nil})
+				return
+			}
+
+		})
+		// job周期任务读取
+		Config.Lock.RLock()
+		for k, v := range Config.CoreConfig.GroupConfig {
+			for k1, v2 := range v.Job {
+				switch v2.Type {
+				case 1:
+					err = b.BotCronManager.AddJob(k, k1, v2.Cron, func() {
+						log.Print("执行任务" + k1)
+						if b.Announce(v2.Title, v2.Content, 0, 10, k) != nil {
+							log.Print(err)
 						}
-					case 2:
-						err = b.BotCronManager.AddJob(k, k1, v2.Cron, func() {
-							log.Print("执行任务" + k1)
-							if b.SetForbidden(0, 1, k, 0) != nil {
-								log.Print(err)
-							}
-						})
-						if err != nil {
-							log.Print("添加任务" + k1 + "出现错误" + err.Error())
+					})
+					if err != nil {
+						log.Print("添加任务" + k1 + "出现错误" + err.Error())
+					}
+				case 2:
+					err = b.BotCronManager.AddJob(k, k1, v2.Cron, func() {
+						log.Print("执行任务" + k1)
+						if b.SetForbidden(0, 1, k, 0) != nil {
+							log.Print(err)
 						}
-					case 3:
-						err = b.BotCronManager.AddJob(k, k1, v2.Cron, func() {
-							log.Print("执行任务" + k1)
-							if b.SetForbidden(0, 0, k, 0) != nil {
-								log.Print(err)
-							}
-						})
-						if err != nil {
-							log.Print("添加任务" + k1 + "出现错误" + err.Error())
+					})
+					if err != nil {
+						log.Print("添加任务" + k1 + "出现错误" + err.Error())
+					}
+				case 3:
+					err = b.BotCronManager.AddJob(k, k1, v2.Cron, func() {
+						log.Print("执行任务" + k1)
+						if b.SetForbidden(0, 0, k, 0) != nil {
+							log.Print(err)
 						}
-					case 4:
-						err = b.BotCronManager.AddJob(k, k1, v2.Cron, func() {
-							log.Print("执行任务" + k1)
-							b.Send(OPQBot.SendMsgPack{
-								SendToType: OPQBot.SendToTypeGroup,
-								ToUserUid:  k,
-								Content: OPQBot.SendTypeTextMsgContent{
-									Content: v2.Content,
-								},
-							})
+					})
+					if err != nil {
+						log.Print("添加任务" + k1 + "出现错误" + err.Error())
+					}
+				case 4:
+					err = b.BotCronManager.AddJob(k, k1, v2.Cron, func() {
+						log.Print("执行任务" + k1)
+						b.Send(OPQBot.SendMsgPack{
+							SendToType: OPQBot.SendToTypeGroup,
+							ToUserUid:  k,
+							Content: OPQBot.SendTypeTextMsgContent{
+								Content: v2.Content,
+							},
 						})
-						if err != nil {
-							log.Print("添加任务" + k1 + "出现错误" + err.Error())
-						}
+					})
+					if err != nil {
+						log.Print("添加任务" + k1 + "出现错误" + err.Error())
 					}
 				}
 			}
-			Config.Lock.RUnlock()
-			needAuth := App.Party("/api/admin", requireAuth)
+		}
+		Config.Lock.RUnlock()
+		needAuth := App.Party("/api/admin", requireAuth)
+		{
+			rJob := needAuth.Party("/job")
 			{
-				rJob := needAuth.Party("/job")
-				{
-					rJob.Post("/add", func(ctx iris.Context) {
-						ids := ctx.FormValue("id")
-						id, err := strconv.ParseInt(ids, 10, 64)
-						if err != nil {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-							return
-						}
-						if id == -1 {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: "默认群禁止添加周期任务", Data: nil})
-							return
-						}
-						span := ctx.FormValue("span")
-						jobName := ctx.FormValue("jobName")
-						if jobName == "" {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: "jobName为空", Data: nil})
-							return
-						}
-						cronType, _ := strconv.Atoi(ctx.FormValue("type"))
-						switch cronType {
-						// 公告
-						case 1:
-							title := ctx.FormValue("title")
-							content := ctx.FormValue("content")
-							err = b.BotCronManager.AddJob(id, jobName, span, func() {
-								log.Print("执行任务" + jobName)
-								if b.Announce(title, content, 0, 10, id) != nil {
-									log.Print(err)
-								}
-							})
-							if err != nil {
-								_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-								return
-							} else {
-								job := Config.Job{Type: cronType, Cron: span, Title: title, Content: content}
-								Config.Lock.Lock()
-								defer Config.Lock.Unlock()
-								if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
-									v.Job[jobName] = job
-									Config.CoreConfig.GroupConfig[id] = v
-								} else {
-									v = Config.CoreConfig.DefaultGroupConfig
-									v.Job[jobName] = job
-									Config.CoreConfig.GroupConfig[id] = v
-								}
-								Config.Save()
-								_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
-								return
-							}
-						// 全局禁言
-						case 2:
-							err = b.BotCronManager.AddJob(id, jobName, span, func() {
-								log.Print("执行任务" + jobName)
-								if b.SetForbidden(0, 1, id, 0) != nil {
-									log.Print(err)
-								}
-							})
-							if err != nil {
-								_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-								return
-							} else {
-								job := Config.Job{Type: cronType, Cron: span}
-								Config.Lock.Lock()
-								defer Config.Lock.Unlock()
-								if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
-									v.Job[jobName] = job
-									Config.CoreConfig.GroupConfig[id] = v
-								} else {
-									v = Config.CoreConfig.DefaultGroupConfig
-									v.Job[jobName] = job
-									Config.CoreConfig.GroupConfig[id] = v
-								}
-								Config.Save()
-								_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
-								return
-							}
-						// 解除全局禁言
-						case 3:
-							err = b.BotCronManager.AddJob(id, jobName, span, func() {
-								log.Print("执行任务" + jobName)
-								if b.SetForbidden(0, 0, id, 0) != nil {
-									log.Print(err)
-								}
-							})
-							if err != nil {
-								_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-								return
-							} else {
-								job := Config.Job{Type: cronType, Cron: span}
-								Config.Lock.Lock()
-								defer Config.Lock.Unlock()
-								if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
-									v.Job[jobName] = job
-									Config.CoreConfig.GroupConfig[id] = v
-								} else {
-									v = Config.CoreConfig.DefaultGroupConfig
-									v.Job[jobName] = job
-									Config.CoreConfig.GroupConfig[id] = v
-								}
-								Config.Save()
-								_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
-								return
-							}
-						case 4:
-							// title := ctx.FormValue("title")
-							content := ctx.FormValue("content")
-							err = b.BotCronManager.AddJob(id, jobName, span, func() {
-								log.Print("执行任务" + jobName)
-								b.Send(OPQBot.SendMsgPack{
-									SendToType: OPQBot.SendToTypeGroup,
-									ToUserUid:  id,
-									Content: OPQBot.SendTypeTextMsgContent{
-										Content: content,
-									},
-								})
-							})
-							if err != nil {
-								_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-								return
-							} else {
-								job := Config.Job{Type: cronType, Cron: span, Content: content}
-								Config.Lock.Lock()
-								defer Config.Lock.Unlock()
-								if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
-									v.Job[jobName] = job
-									Config.CoreConfig.GroupConfig[id] = v
-								} else {
-									v = Config.CoreConfig.DefaultGroupConfig
-									v.Job[jobName] = job
-									Config.CoreConfig.GroupConfig[id] = v
-								}
-								Config.Save()
-								_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
-								return
-							}
-						default:
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: "类型不存在", Data: nil})
-							return
-						}
-					})
-					rJob.Post("/del", func(ctx iris.Context) {
-						ids := ctx.FormValue("id")
-						id, err := strconv.ParseInt(ids, 10, 64)
-						if err != nil {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-							return
-						}
-						if id == -1 {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: "默认群禁止删除周期任务", Data: nil})
-							return
-						}
-						jobName := ctx.FormValue("jobName")
-						if jobName == "" {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: "jobName为空", Data: nil})
-							return
-						}
-						err = b.BotCronManager.Remove(id, jobName)
-
-						if err != nil {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-							return
-						}
-						Config.Lock.Lock()
-						defer Config.Lock.Unlock()
-						if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
-							delete(v.Job, jobName)
-							Config.CoreConfig.GroupConfig[id] = v
-						} else {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: "Group在配置文件中不存在！", Data: nil})
-							return
-						}
-						Config.Save()
-						_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
-					})
-				}
-				needAuth.Post("/getGroupMember", func(ctx iris.Context) {
+				rJob.Post("/add", func(ctx iris.Context) {
 					ids := ctx.FormValue("id")
 					id, err := strconv.ParseInt(ids, 10, 64)
 					if err != nil {
@@ -656,68 +482,223 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 						return
 					}
 					if id == -1 {
-						_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: []int{}})
+						_, _ = ctx.JSON(WebResult{Code: 0, Info: "默认群禁止添加周期任务", Data: nil})
 						return
 					}
-
-					glist, err := b.GetGroupMemberList(id, 0)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					span := ctx.FormValue("span")
+					jobName := ctx.FormValue("jobName")
+					if jobName == "" {
+						_, _ = ctx.JSON(WebResult{Code: 0, Info: "jobName为空", Data: nil})
 						return
 					}
-					result := glist
-					for {
-						if glist.LastUin == 0 {
-							break
-						}
-						glist, err = b.GetGroupMemberList(id, glist.LastUin)
+					cronType, _ := strconv.Atoi(ctx.FormValue("type"))
+					switch cronType {
+					// 公告
+					case 1:
+						title := ctx.FormValue("title")
+						content := ctx.FormValue("content")
+						err = b.BotCronManager.AddJob(id, jobName, span, func() {
+							log.Print("执行任务" + jobName)
+							if b.Announce(title, content, 0, 10, id) != nil {
+								log.Print(err)
+							}
+						})
 						if err != nil {
 							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
 							return
+						} else {
+							job := Config.Job{Type: cronType, Cron: span, Title: title, Content: content}
+							Config.Lock.Lock()
+							defer Config.Lock.Unlock()
+							if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+								v.Job[jobName] = job
+								Config.CoreConfig.GroupConfig[id] = v
+							} else {
+								v = Config.CoreConfig.DefaultGroupConfig
+								v.Job[jobName] = job
+								Config.CoreConfig.GroupConfig[id] = v
+							}
+							Config.Save()
+							_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+							return
 						}
-						result.MemberList = append(result.MemberList, glist.MemberList...)
-						result.Count += glist.Count
-						result.LastUin = glist.LastUin
+					// 全局禁言
+					case 2:
+						err = b.BotCronManager.AddJob(id, jobName, span, func() {
+							log.Print("执行任务" + jobName)
+							if b.SetForbidden(0, 1, id, 0) != nil {
+								log.Print(err)
+							}
+						})
+						if err != nil {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							return
+						} else {
+							job := Config.Job{Type: cronType, Cron: span}
+							Config.Lock.Lock()
+							defer Config.Lock.Unlock()
+							if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+								v.Job[jobName] = job
+								Config.CoreConfig.GroupConfig[id] = v
+							} else {
+								v = Config.CoreConfig.DefaultGroupConfig
+								v.Job[jobName] = job
+								Config.CoreConfig.GroupConfig[id] = v
+							}
+							Config.Save()
+							_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+							return
+						}
+					// 解除全局禁言
+					case 3:
+						err = b.BotCronManager.AddJob(id, jobName, span, func() {
+							log.Print("执行任务" + jobName)
+							if b.SetForbidden(0, 0, id, 0) != nil {
+								log.Print(err)
+							}
+						})
+						if err != nil {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							return
+						} else {
+							job := Config.Job{Type: cronType, Cron: span}
+							Config.Lock.Lock()
+							defer Config.Lock.Unlock()
+							if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+								v.Job[jobName] = job
+								Config.CoreConfig.GroupConfig[id] = v
+							} else {
+								v = Config.CoreConfig.DefaultGroupConfig
+								v.Job[jobName] = job
+								Config.CoreConfig.GroupConfig[id] = v
+							}
+							Config.Save()
+							_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+							return
+						}
+					case 4:
+						// title := ctx.FormValue("title")
+						content := ctx.FormValue("content")
+						err = b.BotCronManager.AddJob(id, jobName, span, func() {
+							log.Print("执行任务" + jobName)
+							b.Send(OPQBot.SendMsgPack{
+								SendToType: OPQBot.SendToTypeGroup,
+								ToUserUid:  id,
+								Content: OPQBot.SendTypeTextMsgContent{
+									Content: content,
+								},
+							})
+						})
+						if err != nil {
+							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							return
+						} else {
+							job := Config.Job{Type: cronType, Cron: span, Content: content}
+							Config.Lock.Lock()
+							defer Config.Lock.Unlock()
+							if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+								v.Job[jobName] = job
+								Config.CoreConfig.GroupConfig[id] = v
+							} else {
+								v = Config.CoreConfig.DefaultGroupConfig
+								v.Job[jobName] = job
+								Config.CoreConfig.GroupConfig[id] = v
+							}
+							Config.Save()
+							_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+							return
+						}
+					default:
+						_, _ = ctx.JSON(WebResult{Code: 0, Info: "类型不存在", Data: nil})
+						return
 					}
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: result})
-					return
 				})
-				needAuth.Post("/setGroupConfig", func(ctx iris.Context) {
+				rJob.Post("/del", func(ctx iris.Context) {
 					ids := ctx.FormValue("id")
-					enable := ctx.FormValue("enable")
 					id, err := strconv.ParseInt(ids, 10, 64)
 					if err != nil {
 						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
 						return
 					}
-					if enable != "" {
-						Config.Lock.Lock()
-						defer Config.Lock.Unlock()
-						Enable := ctx.FormValue("enable") == "true"
-						if id == -1 {
-							Config.CoreConfig.DefaultGroupConfig.Enable = Enable
-							_, _ = ctx.JSON(WebResult{
-								Code: 1,
-								Info: "默认配置保存成功!",
-								Data: Config.CoreConfig.GroupConfig[id].Enable,
-							})
-							err := Config.Save()
-							if err != nil {
-								log.Println(err)
-							}
-							return
-						}
-						if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
-							v.Enable = Enable
-							Config.CoreConfig.GroupConfig[id] = v
-						} else {
-							v = Config.CoreConfig.DefaultGroupConfig
-							v.Enable = Enable
-							Config.CoreConfig.GroupConfig[id] = v
-						}
+					if id == -1 {
+						_, _ = ctx.JSON(WebResult{Code: 0, Info: "默认群禁止删除周期任务", Data: nil})
+						return
+					}
+					jobName := ctx.FormValue("jobName")
+					if jobName == "" {
+						_, _ = ctx.JSON(WebResult{Code: 0, Info: "jobName为空", Data: nil})
+						return
+					}
+					err = b.BotCronManager.Remove(id, jobName)
+
+					if err != nil {
+						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+						return
+					}
+					Config.Lock.Lock()
+					defer Config.Lock.Unlock()
+					if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+						delete(v.Job, jobName)
+						Config.CoreConfig.GroupConfig[id] = v
+					} else {
+						_, _ = ctx.JSON(WebResult{Code: 0, Info: "Group在配置文件中不存在！", Data: nil})
+						return
+					}
+					Config.Save()
+					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+				})
+			}
+			needAuth.Post("/getGroupMember", func(ctx iris.Context) {
+				ids := ctx.FormValue("id")
+				id, err := strconv.ParseInt(ids, 10, 64)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				if id == -1 {
+					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: []int{}})
+					return
+				}
+
+				glist, err := b.GetGroupMemberList(id, 0)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				result := glist
+				for {
+					if glist.LastUin == 0 {
+						break
+					}
+					glist, err = b.GetGroupMemberList(id, glist.LastUin)
+					if err != nil {
+						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+						return
+					}
+					result.MemberList = append(result.MemberList, glist.MemberList...)
+					result.Count += glist.Count
+					result.LastUin = glist.LastUin
+				}
+				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: result})
+				return
+			})
+			needAuth.Post("/setGroupConfig", func(ctx iris.Context) {
+				ids := ctx.FormValue("id")
+				enable := ctx.FormValue("enable")
+				id, err := strconv.ParseInt(ids, 10, 64)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				if enable != "" {
+					Config.Lock.Lock()
+					defer Config.Lock.Unlock()
+					Enable := ctx.FormValue("enable") == "true"
+					if id == -1 {
+						Config.CoreConfig.DefaultGroupConfig.Enable = Enable
 						_, _ = ctx.JSON(WebResult{
 							Code: 1,
-							Info: "保存成功!",
+							Info: "默认配置保存成功!",
 							Data: Config.CoreConfig.GroupConfig[id].Enable,
 						})
 						err := Config.Save()
@@ -726,160 +707,180 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 						}
 						return
 					}
-					menuData := ctx.FormValue("data[Menu]")
-					menuKeyWordData := ctx.FormValue("data[MenuKeyWord]")
-					Enable := ctx.FormValue("data[Enable]") == "true"
-					ShutUpWord := ctx.FormValue("data[ShutUpWord]")
-					Welcome := ctx.FormValue("data[Welcome]")
-					AdminUin, _ := strconv.ParseInt(ctx.FormValue("data[AdminUin]"), 10, 64)
-					JoinVerifyTime, _ := strconv.Atoi(ctx.FormValue("data[JoinVerifyTime]"))
-					JoinAutoShutUpTime, _ := strconv.Atoi(ctx.FormValue("data[JoinAutoShutUpTime]"))
-					ShutUpTime, _ := strconv.Atoi(ctx.FormValue("data[ShutUpTime]"))
-					JoinVerifyType, _ := strconv.Atoi(ctx.FormValue("data[JoinVerifyType]"))
-					Zan := ctx.FormValue("data[Zan]") == "true"
-					Bili := ctx.FormValue("data[Bili]") == "true"
-					SignIn := ctx.FormValue("data[SignIn]") == "true"
-					Job := map[string]Config.Job{}
-					for k, v := range ctx.FormValues() {
-						//log.Println(k,strings.HasPrefix(k,"data[Job]["),strings.Split(strings.TrimPrefix(k,"data[Job]["),"]"))
-						if strings.HasPrefix(k, "data[Job][") {
-							if v1 := strings.Split(strings.TrimPrefix(k, "data[Job]["), "]"); len(v1) >= 2 && len(v) >= 1 {
-								switch v1[1] {
-								case "[Cron":
-									v2, _ := Job[v1[0]]
-									v2.Cron = v[0]
-									Job[v1[0]] = v2
-								case "[JobType":
-									v2, _ := Job[v1[0]]
-									v2.Type, _ = strconv.Atoi(v[0])
-									Job[v1[0]] = v2
-								case "[Content":
-									v2, _ := Job[v1[0]]
-									v2.Content = v[0]
-									Job[v1[0]] = v2
-								}
-
-							}
-						}
+					if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+						v.Enable = Enable
+						Config.CoreConfig.GroupConfig[id] = v
+					} else {
+						v = Config.CoreConfig.DefaultGroupConfig
+						v.Enable = Enable
+						Config.CoreConfig.GroupConfig[id] = v
 					}
-					Config.Lock.Lock()
-					defer Config.Lock.Unlock()
-
-					if id == -1 {
-						Config.CoreConfig.DefaultGroupConfig = Config.GroupConfig{BiliUps: map[int64]Config.Up{}, Bili: Bili, Job: Job, JoinVerifyType: JoinVerifyType, Welcome: Welcome, SignIn: SignIn, Zan: Zan, JoinVerifyTime: JoinVerifyTime, JoinAutoShutUpTime: JoinAutoShutUpTime, AdminUin: AdminUin, Menu: menuData, MenuKeyWord: menuKeyWordData, Enable: Enable, ShutUpWord: ShutUpWord, ShutUpTime: ShutUpTime}
-						Config.Save()
-						_, _ = ctx.JSON(WebResult{
-							Code: 1,
-							Info: "默认配置，保存成功!",
-							Data: nil,
-						})
-						return
-					}
-					Config.CoreConfig.GroupConfig[id] = Config.GroupConfig{BiliUps: Config.CoreConfig.GroupConfig[id].BiliUps, Bili: Bili, Job: Job, JoinVerifyType: JoinVerifyType, Welcome: Welcome, SignIn: SignIn, Zan: Zan, JoinVerifyTime: JoinVerifyTime, JoinAutoShutUpTime: JoinAutoShutUpTime, AdminUin: AdminUin, Menu: menuData, MenuKeyWord: menuKeyWordData, Enable: Enable, ShutUpWord: ShutUpWord, ShutUpTime: ShutUpTime}
-					Config.Save()
 					_, _ = ctx.JSON(WebResult{
 						Code: 1,
 						Info: "保存成功!",
+						Data: Config.CoreConfig.GroupConfig[id].Enable,
+					})
+					err := Config.Save()
+					if err != nil {
+						log.Println(err)
+					}
+					return
+				}
+				menuData := ctx.FormValue("data[Menu]")
+				menuKeyWordData := ctx.FormValue("data[MenuKeyWord]")
+				Enable := ctx.FormValue("data[Enable]") == "true"
+				ShutUpWord := ctx.FormValue("data[ShutUpWord]")
+				Welcome := ctx.FormValue("data[Welcome]")
+				AdminUin, _ := strconv.ParseInt(ctx.FormValue("data[AdminUin]"), 10, 64)
+				JoinVerifyTime, _ := strconv.Atoi(ctx.FormValue("data[JoinVerifyTime]"))
+				JoinAutoShutUpTime, _ := strconv.Atoi(ctx.FormValue("data[JoinAutoShutUpTime]"))
+				ShutUpTime, _ := strconv.Atoi(ctx.FormValue("data[ShutUpTime]"))
+				JoinVerifyType, _ := strconv.Atoi(ctx.FormValue("data[JoinVerifyType]"))
+				Zan := ctx.FormValue("data[Zan]") == "true"
+				Bili := ctx.FormValue("data[Bili]") == "true"
+				SignIn := ctx.FormValue("data[SignIn]") == "true"
+				Job := map[string]Config.Job{}
+				for k, v := range ctx.FormValues() {
+					//log.Println(k,strings.HasPrefix(k,"data[Job]["),strings.Split(strings.TrimPrefix(k,"data[Job]["),"]"))
+					if strings.HasPrefix(k, "data[Job][") {
+						if v1 := strings.Split(strings.TrimPrefix(k, "data[Job]["), "]"); len(v1) >= 2 && len(v) >= 1 {
+							switch v1[1] {
+							case "[Cron":
+								v2, _ := Job[v1[0]]
+								v2.Cron = v[0]
+								Job[v1[0]] = v2
+							case "[JobType":
+								v2, _ := Job[v1[0]]
+								v2.Type, _ = strconv.Atoi(v[0])
+								Job[v1[0]] = v2
+							case "[Content":
+								v2, _ := Job[v1[0]]
+								v2.Content = v[0]
+								Job[v1[0]] = v2
+							}
+
+						}
+					}
+				}
+				Config.Lock.Lock()
+				defer Config.Lock.Unlock()
+
+				if id == -1 {
+					Config.CoreConfig.DefaultGroupConfig = Config.GroupConfig{BiliUps: map[int64]Config.Up{}, Bili: Bili, Job: Job, JoinVerifyType: JoinVerifyType, Welcome: Welcome, SignIn: SignIn, Zan: Zan, JoinVerifyTime: JoinVerifyTime, JoinAutoShutUpTime: JoinAutoShutUpTime, AdminUin: AdminUin, Menu: menuData, MenuKeyWord: menuKeyWordData, Enable: Enable, ShutUpWord: ShutUpWord, ShutUpTime: ShutUpTime}
+					Config.Save()
+					_, _ = ctx.JSON(WebResult{
+						Code: 1,
+						Info: "默认配置，保存成功!",
 						Data: nil,
 					})
 					return
+				}
+				Config.CoreConfig.GroupConfig[id] = Config.GroupConfig{BiliUps: Config.CoreConfig.GroupConfig[id].BiliUps, Bili: Bili, Job: Job, JoinVerifyType: JoinVerifyType, Welcome: Welcome, SignIn: SignIn, Zan: Zan, JoinVerifyTime: JoinVerifyTime, JoinAutoShutUpTime: JoinAutoShutUpTime, AdminUin: AdminUin, Menu: menuData, MenuKeyWord: menuKeyWordData, Enable: Enable, ShutUpWord: ShutUpWord, ShutUpTime: ShutUpTime}
+				Config.Save()
+				_, _ = ctx.JSON(WebResult{
+					Code: 1,
+					Info: "保存成功!",
+					Data: nil,
 				})
-				needAuth.Post("/groupStatus", func(ctx iris.Context) {
-					ids := ctx.FormValue("id")
-					id, err := strconv.ParseInt(ids, 10, 64)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-						return
-					}
-					Config.Lock.RLock()
-					defer Config.Lock.RUnlock()
-					if id == -1 {
-						_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: Config.CoreConfig.DefaultGroupConfig})
-						return
-					}
-					if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
-						_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: v})
-						return
-					} else {
-						_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: Config.CoreConfig.DefaultGroupConfig})
-						return
-					}
-				})
-				needAuth.Get("/groups", func(ctx iris.Context) {
-					g, err := b.GetGroupList("")
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{
-							Code: 0,
-							Info: err.Error(),
-							Data: nil,
-						})
-						return
-					}
-					_, _ = ctx.JSON(WebResult{
-						Code: 1,
-						Info: "success",
-						Data: g,
-					})
-				})
-				needAuth.Post("/shutUp", func(ctx iris.Context) {
-					ids := ctx.FormValue("id")
-					uins := ctx.FormValue("uin")
-					times := ctx.FormValue("time")
-					id, err := strconv.ParseInt(ids, 10, 64)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-						return
-					}
-					uin, err := strconv.ParseInt(uins, 10, 64)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-						return
-					}
-					time1, err := strconv.Atoi(times)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-						return
-					}
-					err = b.SetForbidden(1, time1, id, uin)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-						return
-					}
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+				return
+			})
+			needAuth.Post("/groupStatus", func(ctx iris.Context) {
+				ids := ctx.FormValue("id")
+				id, err := strconv.ParseInt(ids, 10, 64)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
 					return
-				})
-				needAuth.Post("/kick", func(ctx iris.Context) {
-					ids := ctx.FormValue("id")
-					uins := ctx.FormValue("uin")
-					id, err := strconv.ParseInt(ids, 10, 64)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-						return
-					}
-					uin, err := strconv.ParseInt(uins, 10, 64)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-						return
-					}
-					err = b.KickGroupMember(id, uin)
-					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
-						return
-					}
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+				}
+				Config.Lock.RLock()
+				defer Config.Lock.RUnlock()
+				if id == -1 {
+					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: Config.CoreConfig.DefaultGroupConfig})
 					return
-				})
-				needAuth.Get("/logout", func(ctx iris.Context) {
-					s := sess.Start(ctx)
-					s.Set("auth", false)
-					s.Clear()
+				}
+				if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
+					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: v})
+					return
+				} else {
+					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: Config.CoreConfig.DefaultGroupConfig})
+					return
+				}
+			})
+			needAuth.Get("/groups", func(ctx iris.Context) {
+				g, err := b.GetGroupList("")
+				if err != nil {
 					_, _ = ctx.JSON(WebResult{
-						Code: 1,
-						Info: "Success",
+						Code: 0,
+						Info: err.Error(),
 						Data: nil,
 					})
+					return
+				}
+				_, _ = ctx.JSON(WebResult{
+					Code: 1,
+					Info: "success",
+					Data: g,
 				})
-			}
+			})
+			needAuth.Post("/shutUp", func(ctx iris.Context) {
+				ids := ctx.FormValue("id")
+				uins := ctx.FormValue("uin")
+				times := ctx.FormValue("time")
+				id, err := strconv.ParseInt(ids, 10, 64)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				uin, err := strconv.ParseInt(uins, 10, 64)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				time1, err := strconv.Atoi(times)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				err = b.SetForbidden(1, time1, id, uin)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+				return
+			})
+			needAuth.Post("/kick", func(ctx iris.Context) {
+				ids := ctx.FormValue("id")
+				uins := ctx.FormValue("uin")
+				id, err := strconv.ParseInt(ids, 10, 64)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				uin, err := strconv.ParseInt(uins, 10, 64)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				err = b.KickGroupMember(id, uin)
+				if err != nil {
+					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					return
+				}
+				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+				return
+			})
+			needAuth.Get("/logout", func(ctx iris.Context) {
+				s := sess.Start(ctx)
+				s.Set("auth", false)
+				s.Clear()
+				_, _ = ctx.JSON(WebResult{
+					Code: 1,
+					Info: "Success",
+					Data: nil,
+				})
+			})
+		}
+		go func() {
 			App.Logger().Prefix = "[Web]"
 			err := App.Run(iris.Addr(Config.CoreConfig.OPQWebConfig.Host+":"+strconv.Itoa(Config.CoreConfig.OPQWebConfig.Port)), iris.WithoutStartupLog)
 			if err != nil {
@@ -887,6 +888,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				return
 			}
 		}()
+
 	}
 	return nil
 }

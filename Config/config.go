@@ -7,7 +7,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
 )
 
@@ -36,6 +35,7 @@ type CoreConfigStruct struct {
 		PixivRefreshToken string
 		PixivProxy        string
 	}
+	BanQQ              []int64
 	Debug              bool
 	BiliLive           bool
 	YiQing             bool
@@ -113,10 +113,10 @@ func Save() error {
 }
 
 func init() {
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Fatal(err)
-	}
+	//watcher, err := fsnotify.NewWatcher()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
 	if len(os.Args) == 2 && os.Args[1] == "first" {
 		b, err := yaml.Marshal(CoreConfig)
@@ -140,38 +140,38 @@ func init() {
 		panic(err)
 	}
 	Save()
-	go func() {
-		for {
-			select {
-			case event, ok := <-watcher.Events:
-				if !ok {
-					return
-				}
-				if event.Op&fsnotify.Write == fsnotify.Write {
-					b, err := ioutil.ReadFile("./config.yaml")
-					if err != nil {
-						log.Println("读取配置文件失败")
-						break
-					}
-					Lock.Lock()
-					err = yaml.Unmarshal(b, &CoreConfig)
-					Lock.Unlock()
-					if err != nil {
-						log.Println("读取配置文件失败")
-						break
-					}
-				}
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					return
-				}
-				log.Println("error:", err)
-			}
-		}
-	}()
-	err = watcher.Add("./config.yaml")
-	if err != nil {
-		log.Fatal(err)
-	}
+	//go func() {
+	//	for {
+	//		select {
+	//		case event, ok := <-watcher.Events:
+	//			if !ok {
+	//				return
+	//			}
+	//			if event.Op&fsnotify.Write == fsnotify.Write {
+	//				b, err := ioutil.ReadFile("./config.yaml")
+	//				if err != nil {
+	//					log.Println("读取配置文件失败")
+	//					break
+	//				}
+	//				Lock.Lock()
+	//				err = yaml.Unmarshal(b, &CoreConfig)
+	//				Lock.Unlock()
+	//				if err != nil {
+	//					log.Println("读取配置文件失败")
+	//					break
+	//				}
+	//			}
+	//		case err, ok := <-watcher.Errors:
+	//			if !ok {
+	//				return
+	//			}
+	//			log.Println("error:", err)
+	//		}
+	//	}
+	//}()
+	//err = watcher.Add("./config.yaml")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 	dbInit()
 }
