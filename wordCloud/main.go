@@ -4,30 +4,28 @@ import (
 	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/Core"
 	"bytes"
-	"encoding/base64"
-	"encoding/json"
-	"github.com/go-echarts/go-echarts/charts"
 	"github.com/go-ego/gse"
 	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
-
-	//"github.com/psykhi/wordclouds"
+	"github.com/mcoo/wordclouds"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+	"image/color"
+	"image/png"
 	"time"
 )
 
-//var DefaultColors = []color.RGBA{
-//	{0x1b, 0x1b, 0x1b, 0xff},
-//	{0x48, 0x48, 0x4B, 0xff},
-//	{0x59, 0x3a, 0xee, 0xff},
-//	{0x65, 0xCD, 0xFA, 0xff},
-//	{0x70, 0xD6, 0xBF, 0xff},
-//	{153, 50, 204, 255},
-//	{100, 149, 237, 255},
-//	{0, 255, 127, 255},
-//	{255, 0, 0, 255},
-//}
+var DefaultColors = []color.RGBA{
+	{0x1b, 0x1b, 0x1b, 0xff},
+	{0x48, 0x48, 0x4B, 0xff},
+	{0x59, 0x3a, 0xee, 0xff},
+	{0x65, 0xCD, 0xFA, 0xff},
+	{0x70, 0xD6, 0xBF, 0xff},
+	{153, 50, 204, 255},
+	{100, 149, 237, 255},
+	{0, 255, 127, 255},
+	{255, 0, 0, 255},
+}
 
 type Module struct {
 	db         *gorm.DB
@@ -41,11 +39,10 @@ var (
 
 func (m *Module) ModuleInfo() Core.ModuleInfo {
 	return Core.ModuleInfo{
-		Name:          "词云生成",
-		Author:        "enjoy",
-		Description:   "给群生成聊天词云",
-		Version:       0,
-		RequireModule: []string{"群管理插件"},
+		Name:        "词云生成",
+		Author:      "enjoy",
+		Description: "给群生成聊天词云",
+		Version:     0,
 	}
 }
 
@@ -127,98 +124,31 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					return
 				}
 				sendMsg := "今日本群词云"
-				hotMap := map[string]interface{}{}
+				hotMap := map[string]int{}
 				for i := 0; i < len(hotWords); i++ {
-					if i >= 100 {
-						break
-					}
 					if len([]rune(hotWords[i].Word)) <= 1 {
 						continue
 					}
 					hotMap[hotWords[i].Word] = hotWords[i].Count
-
 				}
 				log.Info(hotMap)
-				//colors := make([]color.Color, 0)
-				//for _, c := range DefaultColors {
-				//	colors = append(colors, c)
-				//}
-
-				//img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(150), wordclouds.FontMinSize(20), wordclouds.FontFile("./font.ttf"),
-				//	wordclouds.Height(1024),
-				//	wordclouds.Width(2048), wordclouds.Colors(colors))
-				w := charts.NewWordCloud()
-				w.SetGlobalOptions(charts.TitleOpts{Title: sendMsg})
-				w.Add(sendMsg, hotMap, charts.WordCloudOpts{Shape: "circle", SizeRange: []float32{14, 128}})
+				colors := make([]color.Color, 0)
+				for _, c := range DefaultColors {
+					colors = append(colors, c)
+				}
+				b.PrintMemStats()
+				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(150), wordclouds.FontMinSize(20), wordclouds.FontFile("./font.ttf"),
+					wordclouds.Height(1024),
+					wordclouds.Width(2048), wordclouds.Colors(colors)).Draw()
+				b.PrintMemStats()
 				buf := new(bytes.Buffer)
-				err = w.Render(buf)
+				err = png.Encode(buf, img)
 				if err != nil {
 					log.Error(err)
 					return
 				}
-				//err = png.Encode(buf, img.Draw())
-				//if err != nil {
-				//	log.Error(err)
-				//	return
-				//}
-				bt, err := json.Marshal(&ReqStruct{
-					To: "image",
-					Fetcher: struct {
-						Name   string `json:"name"`
-						Params struct {
-							Data string `json:"data"`
-						} `json:"params"`
-					}{Name: "data",
-						Params: struct {
-							Data string `json:"data"`
-						}{Data: base64.StdEncoding.EncodeToString(buf.Bytes())},
-					},
-					Converter: struct {
-						Extend struct {
-							JavascriptDelay string `json:"javascript-delay"`
-						} `json:"extend"`
-					}(struct {
-						Extend struct {
-							JavascriptDelay string `json:"javascript-delay"`
-						}
-					}{Extend: struct {
-						JavascriptDelay string `json:"javascript-delay"`
-					}(struct {
-						JavascriptDelay string
-					}{JavascriptDelay: "10000"})}),
-					Template: "",
-				})
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				//log.Info(string(bt))
-				r, err := requests.PostJson(m.ImgServer, string(bt))
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				var result Result
-				err = r.Json(&result)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				if result.Code != 0 {
-					log.Error(result.Code, result.Message)
-					return
-				}
-				b.Send(OPQBot.SendMsgPack{
-					SendToType: OPQBot.SendToTypeGroup,
-					ToUserUid:  packet.FromGroupID,
-					Content: OPQBot.SendTypePicMsgByBase64Content{
-						Content: sendMsg,
-						Base64:  result.Result.Data,
-						Flash:   false,
-					},
-					CallbackFunc: nil,
-				})
-				return
+				b.PrintMemStats()
+				b.SendGroupPicMsg(packet.FromGroupID, sendMsg, buf.Bytes())
 			}
 			if packet.Content == "奥运会" {
 				r, err := requests.PostJson(m.ImgServer, `{
@@ -260,9 +190,8 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					log.Error(err)
 					return
 				}
-
 				sendMsg := "本周词云"
-				hotMap := map[string]interface{}{}
+				hotMap := map[string]int{}
 				for i := 0; i < len(hotWords); i++ {
 					if len([]rune(hotWords[i].Word)) <= 1 {
 						continue
@@ -270,79 +199,24 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					hotMap[hotWords[i].Word] = hotWords[i].Count
 				}
 				log.Info(hotMap)
+				colors := make([]color.Color, 0)
+				for _, c := range DefaultColors {
+					colors = append(colors, c)
+				}
 
-				w := charts.NewWordCloud()
-				w.SetGlobalOptions(charts.TitleOpts{Title: sendMsg})
-				w.Add(sendMsg, hotMap, charts.WordCloudOpts{Shape: "circle", SizeRange: []float32{14, 128}})
+				b.PrintMemStats()
+				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(150), wordclouds.FontMinSize(20), wordclouds.FontFile("./font.ttf"),
+					wordclouds.Height(1024),
+					wordclouds.Width(2048), wordclouds.Colors(colors)).Draw()
+				b.PrintMemStats()
 				buf := new(bytes.Buffer)
-				err = w.Render(buf)
+				err = png.Encode(buf, img)
 				if err != nil {
 					log.Error(err)
 					return
 				}
-				//err = png.Encode(buf, img.Draw())
-				//if err != nil {
-				//	log.Error(err)
-				//	return
-				//}
-				bt, err := json.Marshal(&ReqStruct{
-					To: "image",
-					Fetcher: struct {
-						Name   string `json:"name"`
-						Params struct {
-							Data string `json:"data"`
-						} `json:"params"`
-					}{Name: "data",
-						Params: struct {
-							Data string `json:"data"`
-						}{Data: base64.StdEncoding.EncodeToString(buf.Bytes())},
-					},
-					Converter: struct {
-						Extend struct {
-							JavascriptDelay string `json:"javascript-delay"`
-						} `json:"extend"`
-					}(struct {
-						Extend struct {
-							JavascriptDelay string `json:"javascript-delay"`
-						}
-					}{Extend: struct {
-						JavascriptDelay string `json:"javascript-delay"`
-					}(struct {
-						JavascriptDelay string
-					}{JavascriptDelay: "10000"})}),
-					Template: "",
-				})
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				//log.Info(string(bt))
-				r, err := requests.PostJson(m.ImgServer, string(bt))
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				var result Result
-				err = r.Json(&result)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				if result.Code != 0 {
-					log.Error(result.Code, result.Message)
-					return
-				}
-				b.Send(OPQBot.SendMsgPack{
-					SendToType: OPQBot.SendToTypeGroup,
-					ToUserUid:  packet.FromGroupID,
-					Content: OPQBot.SendTypePicMsgByBase64Content{
-						Content: sendMsg,
-						Base64:  result.Result.Data,
-						Flash:   false,
-					},
-					CallbackFunc: nil,
-				})
-				return
+				b.PrintMemStats()
+				b.SendGroupPicMsg(packet.FromGroupID, sendMsg, buf.Bytes())
 			}
 		}
 	})

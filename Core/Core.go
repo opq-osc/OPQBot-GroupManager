@@ -9,6 +9,7 @@ import (
 	"github.com/mcoo/OPQBot"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+	"runtime"
 )
 
 var log = logrus.New()
@@ -92,6 +93,16 @@ func RegisterModule(module Module) error {
 		Modules[module.ModuleInfo().Name] = module
 	}
 	return nil
+}
+
+var lastTotalFreed uint64
+
+func (b *Bot) PrintMemStats() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	log.Printf("Alloc = %v TotalAlloc = %v  Just Freed = %v Sys = %v NumGC = %v\n",
+		m.Alloc/1024, m.TotalAlloc/1024, ((m.TotalAlloc-m.Alloc)-lastTotalFreed)/1024, m.Sys/1024, m.NumGC)
+	lastTotalFreed = m.TotalAlloc - m.Alloc
 }
 
 // Bot 内置了"周期任务","数据库"
