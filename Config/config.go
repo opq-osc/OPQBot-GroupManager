@@ -36,6 +36,7 @@ type CoreConfigStruct struct {
 		PixivRefreshToken string
 		PixivProxy        string
 	}
+	HtmlToImgUrl       string
 	DisableModule      []string
 	BanQQ              []int64
 	Debug              bool

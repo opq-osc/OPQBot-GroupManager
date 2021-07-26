@@ -5,7 +5,7 @@ import (
 	_ "OPQBot-QQGroupManager/Bili"
 	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/Core"
-	_ "OPQBot-QQGroupManager/GroupManager"
+	"OPQBot-QQGroupManager/GroupManager"
 	"OPQBot-QQGroupManager/androidDns"
 	_ "OPQBot-QQGroupManager/genAndYiqin"
 	_ "OPQBot-QQGroupManager/githubManager"
@@ -77,5 +77,6 @@ func main() {
 	if err != nil {
 		log.Error(err)
 	}
+	GroupManager.Start <- struct{}{}
 	b.Wait()
 }

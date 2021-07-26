@@ -101,7 +101,7 @@ func (m *Module) ModuleInfo() Core.ModuleInfo {
 }
 func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
-	b.BotCronManager.AddJob(-1, "Yiqing", "* 8,18 * * *", func() {
+	b.BotCronManager.AddJob(-1, "Yiqing", "0 8,18 * * *", func() {
 		client := &http.Client{}
 		baseUrl := "https://m.sm.cn/api/rest?method=Huoshenshan.local"
 		req, err := http.NewRequest("GET", baseUrl, nil)

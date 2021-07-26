@@ -33,8 +33,9 @@ type WebResult struct {
 }
 
 var (
-	App  = iris.New()
-	sess *sessions.Sessions
+	App   = iris.New()
+	Start = make(chan struct{})
+	sess  *sessions.Sessions
 )
 
 type Module struct {
@@ -370,7 +371,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					r.URL.Path = "/"
 				}
 			} else {
-				if r.URL.Path[0:4] != "/api" && r.URL.Path[0:4] != "/git" {
+				if r.URL.Path[0:4] != "/api" && r.URL.Path[0:4] != "/git" && r.URL.Path[0:4] != "/wor" {
 					if !pathIsFile(path) {
 						r.URL.Path = "/"
 					}
@@ -880,7 +881,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				})
 			})
 		}
+
 		go func() {
+			_ = <-Start
 			App.Logger().Prefix = "[Web]"
 			err := App.Run(iris.Addr(Config.CoreConfig.OPQWebConfig.Host+":"+strconv.Itoa(Config.CoreConfig.OPQWebConfig.Port)), iris.WithoutStartupLog)
 			if err != nil {

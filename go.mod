@@ -7,6 +7,7 @@ require (
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
 	github.com/fogleman/gg v1.3.0
 	github.com/gaoyanpao/biliLiveHelper v0.0.0-20210205164551-dca3842ab39b
+	github.com/go-echarts/go-echarts v1.0.0
 	github.com/go-ego/gse v0.67.0
 	github.com/go-playground/webhooks/v6 v6.0.0-beta.3
 	github.com/kataras/iris/v12 v12.2.0-alpha2.0.20210427211137-fa175eb84754
