@@ -110,6 +110,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	}
 	Config.Lock.RLock()
 	m.ImgServer = Config.CoreConfig.HtmlToImgUrl
+	if Config.CoreConfig.Debug {
+		m.db = m.db.Debug()
+	}
 	Config.Lock.RUnlock()
 
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
@@ -267,7 +270,7 @@ func (m *Module) AddHotWord(word string, groupId int64) error {
 	var hotWord []HotWord
 
 	t, _ := time.ParseInLocation("2006-01-02 15:04:05", time.Now().Add(24*time.Hour).Format("2006-01-02")+" 00:00:00", time.Local)
-	err := m.db.Debug().Where(" (? - hot_time) <= 86400 AND group_id = ? AND word = ?", t.Unix(), groupId, word).Find(&hotWord).Error
+	err := m.db.Where(" (? - hot_time) <= 86400 AND group_id = ? AND word = ?", t.Unix(), groupId, word).Find(&hotWord).Error
 	if err != nil {
 		return err
 	}
