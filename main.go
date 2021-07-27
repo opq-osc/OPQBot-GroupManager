@@ -10,6 +10,7 @@ import (
 	_ "OPQBot-QQGroupManager/genAndYiqin"
 	_ "OPQBot-QQGroupManager/githubManager"
 	_ "OPQBot-QQGroupManager/setu"
+	_ "OPQBot-QQGroupManager/taobao"
 	_ "OPQBot-QQGroupManager/wordCloud"
 	"fmt"
 	"github.com/sirupsen/logrus"

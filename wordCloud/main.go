@@ -4,6 +4,8 @@ import (
 	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/Core"
 	"bytes"
+	"errors"
+	"fmt"
 	"github.com/go-ego/gse"
 	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
@@ -99,6 +101,33 @@ type ReqStruct struct {
 	Template string `json:"template"`
 }
 
+func (m *Module) GetUrlPic(url string, width, height, javascriptDelay int) (string, error) {
+	r, err := requests.PostJson(m.ImgServer, fmt.Sprintf(`{
+  "to": "image",
+  "converter": {
+    "uri": "%s",
+    "width": %d,
+    "height": %d,
+	"extend": {
+          "javascript-delay": "%d"
+	}
+  },
+  "template": ""
+}`, url, width, height, javascriptDelay))
+	if err != nil {
+		return "", err
+	}
+	var result Result
+	err = r.Json(&result)
+	if err != nil {
+		return "", err
+	}
+	if result.Code != 0 {
+		log.Error()
+		return "", errors.New(fmt.Sprintf("[%d] %s", result.Code, result.Message))
+	}
+	return result.Result.Data, nil
+}
 func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
 	m.db = b.DB
@@ -153,28 +182,10 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				b.PrintMemStats()
 				b.SendGroupPicMsg(packet.FromGroupID, sendMsg, buf.Bytes())
 			}
-			if packet.Content == "中国奥运" {
-				r, err := requests.PostJson(m.ImgServer, `{
-  "to": "image",
-  "converter": {
-    "uri": "https://tiyu.baidu.com/tokyoly/delegation/8567/tab/%E5%A5%96%E7%89%8C%E6%98%8E%E7%BB%86",
-    "width": 360,
-    "height": 640
-  },
-  "template": ""
-}`)
+			if packet.Content == "奥运赛程" {
+				pic, err := m.GetUrlPic("https://tiyu.baidu.com/tokyoly/delegation/8567/tab/%E8%B5%9B%E7%A8%8B/type/all", 360, 640, 0)
 				if err != nil {
 					log.Error(err)
-					return
-				}
-				var result Result
-				err = r.Json(&result)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				if result.Code != 0 {
-					log.Error(result.Code, result.Message)
 					return
 				}
 				b.Send(OPQBot.SendMsgPack{
@@ -182,7 +193,25 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					ToUserUid:  packet.FromGroupID,
 					Content: OPQBot.SendTypePicMsgByBase64Content{
 						Content: "",
-						Base64:  result.Result.Data,
+						Base64:  pic,
+						Flash:   false,
+					},
+					CallbackFunc: nil,
+				})
+				return
+			}
+			if packet.Content == "中国奥运" {
+				pic, err := m.GetUrlPic("https://tiyu.baidu.com/tokyoly/delegation/8567/tab/%E5%A5%96%E7%89%8C%E6%98%8E%E7%BB%86", 360, 640, 0)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypeGroup,
+					ToUserUid:  packet.FromGroupID,
+					Content: OPQBot.SendTypePicMsgByBase64Content{
+						Content: "",
+						Base64:  pic,
 						Flash:   false,
 					},
 					CallbackFunc: nil,
@@ -190,27 +219,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				return
 			}
 			if packet.Content == "奥运" {
-				r, err := requests.PostJson(m.ImgServer, `{
-  "to": "image",
-  "converter": {
-    "uri": "https://tiyu.baidu.com/tokyoly/home/tab/%E5%A5%96%E7%89%8C%E6%A6%9C",
-    "width": 360,
-    "height": 640
-  },
-  "template": ""
-}`)
+				pic, err := m.GetUrlPic("https://tiyu.baidu.com/tokyoly/home/tab/%E5%A5%96%E7%89%8C%E6%A6%9C", 360, 640, 0)
 				if err != nil {
 					log.Error(err)
-					return
-				}
-				var result Result
-				err = r.Json(&result)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				if result.Code != 0 {
-					log.Error(result.Code, result.Message)
 					return
 				}
 				b.Send(OPQBot.SendMsgPack{
@@ -218,7 +229,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					ToUserUid:  packet.FromGroupID,
 					Content: OPQBot.SendTypePicMsgByBase64Content{
 						Content: "",
-						Base64:  result.Result.Data,
+						Base64:  pic,
 						Flash:   false,
 					},
 					CallbackFunc: nil,
