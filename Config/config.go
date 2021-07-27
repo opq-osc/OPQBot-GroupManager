@@ -36,6 +36,7 @@ type CoreConfigStruct struct {
 		PixivRefreshToken string
 		PixivProxy        string
 	}
+	SelectChatCore     string
 	HtmlToImgUrl       string
 	DisableModule      []string
 	BanQQ              []int64
@@ -71,6 +72,7 @@ type Job struct {
 }
 type GroupConfig struct {
 	Enable             bool
+	EnableChat         bool
 	AdminUin           int64
 	Menu               string
 	MenuKeyWord        string

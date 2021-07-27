@@ -3,6 +3,9 @@ package GroupManager
 import (
 	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/Core"
+	"OPQBot-QQGroupManager/GroupManager/Chat"
+	_ "OPQBot-QQGroupManager/GroupManager/Chat/Local"
+	_ "OPQBot-QQGroupManager/GroupManager/Chat/Zhai"
 	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/utils"
 	"embed"
@@ -128,7 +131,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			b.SetForbidden(1, c.JoinAutoShutUpTime, packet.EventMsg.FromUin, packet.EventData.UserID)
 		}
 	})
-
+	chat := Chat.StartChatCore(log.WithField("Func", "Chat"))
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
 			return
@@ -160,6 +163,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				}
 			}
 			VerifyLock.Unlock()
+			return
 		}
 		if m, err := regexp.MatchString(c.MenuKeyWord, packet.Content); err != nil {
 			log.Println(err)
@@ -248,6 +252,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				})
 			}
 			Config.Lock.Unlock()
+			return
 		}
 		if packet.Content == "赞我" {
 			if !c.Zan {
@@ -297,6 +302,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				})
 			}
 			Config.Lock.Unlock()
+			return
 		}
 		if packet.Content == "积分" {
 			Config.Lock.RLock()
@@ -316,6 +322,44 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				})
 			}
 			Config.Lock.RUnlock()
+			return
+		}
+		if packet.Content == "开启聊天" {
+			Config.Lock.Lock()
+			c.EnableChat = true
+			Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
+			Config.Save()
+			Config.Lock.Unlock()
+			b.SendGroupTextMsg(packet.FromGroupID, "打开了聊天功能")
+			return
+		}
+		cm := strings.Split(packet.Content, " ")
+		if len(cm) == 2 && cm[0] == "设置聊天数据库" {
+			err = chat.SetChatDB(cm[1])
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, err.Error())
+				return
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, "设置聊天数据库为"+cm[1])
+			return
+		}
+		if packet.Content == "关闭聊天" {
+			Config.Lock.Lock()
+			c.EnableChat = false
+			Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
+			Config.Save()
+			Config.Lock.Unlock()
+			b.SendGroupTextMsg(packet.FromGroupID, "关闭了聊天功能")
+			return
+		}
+		if c.EnableChat {
+			answer, err := chat.GetAnswer(packet.Content, packet.FromGroupID, packet.FromUserID)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+
+			b.SendGroupTextMsg(packet.FromGroupID, OPQBot.MacroAt([]int64{packet.FromUserID})+answer)
 		}
 	})
 	if err != nil {
