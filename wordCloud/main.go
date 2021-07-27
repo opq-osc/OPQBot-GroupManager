@@ -41,7 +41,7 @@ func (m *Module) ModuleInfo() Core.ModuleInfo {
 	return Core.ModuleInfo{
 		Name:        "词云生成",
 		Author:      "enjoy",
-		Description: "给群生成聊天词云",
+		Description: "给群生成聊天词云 还可以查询奥运信息呢！",
 		Version:     0,
 	}
 }
@@ -137,9 +137,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					colors = append(colors, c)
 				}
 				b.PrintMemStats()
-				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(150), wordclouds.FontMinSize(20), wordclouds.FontFile("./font.ttf"),
-					wordclouds.Height(1024),
-					wordclouds.Width(2048), wordclouds.Colors(colors)).Draw()
+				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(200), wordclouds.FontMinSize(40), wordclouds.FontFile("./font.ttf"),
+					wordclouds.Height(1324),
+					wordclouds.Width(1324), wordclouds.Colors(colors)).Draw()
 				b.PrintMemStats()
 				buf := new(bytes.Buffer)
 				err = png.Encode(buf, img)
@@ -150,11 +150,49 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				b.PrintMemStats()
 				b.SendGroupPicMsg(packet.FromGroupID, sendMsg, buf.Bytes())
 			}
-			if packet.Content == "奥运会" {
+			if packet.Content == "中国奥运" {
 				r, err := requests.PostJson(m.ImgServer, `{
   "to": "image",
   "converter": {
-    "uri": "https://tiyu.baidu.com/tokyoly/home/tab/%E5%A5%96%E7%89%8C%E6%A6%9C"
+    "uri": "https://tiyu.baidu.com/tokyoly/delegation/8567/tab/%E5%A5%96%E7%89%8C%E6%98%8E%E7%BB%86",
+    "width": 360,
+    "height": 640
+  },
+  "template": ""
+}`)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				var result Result
+				err = r.Json(&result)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				if result.Code != 0 {
+					log.Error(result.Code, result.Message)
+					return
+				}
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypeGroup,
+					ToUserUid:  packet.FromGroupID,
+					Content: OPQBot.SendTypePicMsgByBase64Content{
+						Content: "",
+						Base64:  result.Result.Data,
+						Flash:   false,
+					},
+					CallbackFunc: nil,
+				})
+				return
+			}
+			if packet.Content == "奥运" {
+				r, err := requests.PostJson(m.ImgServer, `{
+  "to": "image",
+  "converter": {
+    "uri": "https://tiyu.baidu.com/tokyoly/home/tab/%E5%A5%96%E7%89%8C%E6%A6%9C",
+    "width": 360,
+    "height": 640
   },
   "template": ""
 }`)
@@ -205,9 +243,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				}
 
 				b.PrintMemStats()
-				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(150), wordclouds.FontMinSize(20), wordclouds.FontFile("./font.ttf"),
-					wordclouds.Height(1024),
-					wordclouds.Width(2048), wordclouds.Colors(colors)).Draw()
+				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(200), wordclouds.FontMinSize(40), wordclouds.FontFile("./font.ttf"),
+					wordclouds.Height(1324),
+					wordclouds.Width(1324), wordclouds.Colors(colors)).Draw()
 				b.PrintMemStats()
 				buf := new(bytes.Buffer)
 				err = png.Encode(buf, img)
