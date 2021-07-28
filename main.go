@@ -45,6 +45,7 @@ func main() {
 
 	}
 	if Config.CoreConfig.Debug {
+		log.Warn("注意当前处于DEBUG模式，会开放25569端口，如果你不清楚请关闭DEBUG，因为这样可能泄漏你的信息！😥")
 		go func() {
 			ip := ":25569"
 			if err := http.ListenAndServe(ip, nil); err != nil {

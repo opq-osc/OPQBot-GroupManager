@@ -81,15 +81,11 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 	log = l
 	db.AutoMigrate(&setucore.Pic{})
 	Config.Lock.RLock()
-	debug := Config.CoreConfig.Debug
 	p.c.Proxy = Config.CoreConfig.SetuConfig.PixivProxy
 	p.c.refreshToken = Config.CoreConfig.SetuConfig.PixivRefreshToken
 	autoGetPic := Config.CoreConfig.SetuConfig.AutoGetPic
 	Config.Lock.RUnlock()
 	p.db = db
-	if debug {
-		p.db = p.db.Debug()
-	}
 	if p.c.refreshToken == "" {
 		p.c.GenerateLoginUrl()
 	} else {

@@ -36,7 +36,13 @@ type CoreConfigStruct struct {
 		PixivRefreshToken string
 		PixivProxy        string
 	}
-	SelectChatCore     string
+	SelectChatCore string
+	ChatKey        struct {
+		XiaoI struct {
+			Key    string
+			Secret string
+		}
+	}
 	HtmlToImgUrl       string
 	DisableModule      []string
 	BanQQ              []int64

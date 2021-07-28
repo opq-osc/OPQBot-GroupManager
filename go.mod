@@ -10,7 +10,7 @@ require (
 	github.com/go-ego/gse v0.67.0
 	github.com/go-playground/webhooks/v6 v6.0.0-beta.3
 	github.com/kataras/iris/v12 v12.2.0-alpha2.0.20210427211137-fa175eb84754
-	github.com/mcoo/OPQBot v0.1.3-0.20210721042534-b725701428cd
+	github.com/mcoo/OPQBot v0.2.0
 	github.com/mcoo/requests v0.0.2
 	github.com/mcoo/sqlite v1.1.4-fix-1
 	github.com/mcoo/wordclouds v0.0.3

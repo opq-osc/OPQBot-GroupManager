@@ -63,6 +63,6 @@ func (c *Core) SetReplace(regexp string, target string) error {
 func init() {
 	err := Chat.Register("local", &Core{})
 	if err != nil {
-		log.Error(err)
+		panic(err)
 	}
 }

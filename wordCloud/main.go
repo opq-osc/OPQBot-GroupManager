@@ -139,9 +139,6 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	}
 	Config.Lock.RLock()
 	m.ImgServer = Config.CoreConfig.HtmlToImgUrl
-	if Config.CoreConfig.Debug {
-		m.db = m.db.Debug()
-	}
 	Config.Lock.RUnlock()
 
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {

@@ -38,6 +38,11 @@ func dbInit() {
 		sqlDb.SetMaxIdleConns(10)
 		sqlDb.SetMaxOpenConns(100)
 	}
+	Lock.RLock()
+	if CoreConfig.Debug {
+		DB = DB.Debug()
+	}
+	Lock.RUnlock()
 	//err = DB.AutoMigrate(&QQGroup{}, &SQLUp{}, &SQLFanju{},&SQLJob{})
 	//if err != nil {
 	//	log.Println(err)

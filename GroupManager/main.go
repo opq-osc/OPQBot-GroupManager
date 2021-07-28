@@ -5,6 +5,7 @@ import (
 	"OPQBot-QQGroupManager/Core"
 	"OPQBot-QQGroupManager/GroupManager/Chat"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Local"
+	_ "OPQBot-QQGroupManager/GroupManager/Chat/XiaoI"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Zhai"
 	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/utils"
@@ -333,6 +334,10 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			b.SendGroupTextMsg(packet.FromGroupID, "打开了聊天功能")
 			return
 		}
+		if packet.Content == "当前聊天数据库" {
+			b.SendGroupTextMsg(packet.FromGroupID, "设置聊天数据库为"+chat.SelectCore)
+			return
+		}
 		cm := strings.Split(packet.Content, " ")
 		if len(cm) == 2 && cm[0] == "设置聊天数据库" {
 			err = chat.SetChatDB(cm[1])
@@ -355,7 +360,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		if c.EnableChat {
 			answer, err := chat.GetAnswer(packet.Content, packet.FromGroupID, packet.FromUserID)
 			if err != nil {
-				log.Error(err)
+				log.Warn(err)
 				return
 			}
 

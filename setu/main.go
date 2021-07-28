@@ -33,7 +33,6 @@ func (m *Module) ModuleInfo() Core.ModuleInfo {
 }
 func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
-	InitDB(b.DB)
 	px := &pixiv.Provider{}
 	RegisterProvider(px, b, b.DB)
 	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {

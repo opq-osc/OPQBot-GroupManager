@@ -13,7 +13,7 @@ dbconfig:
     dbpassword: ""
     dbip: ""
     dbport: ""
-    dbname: "data.db"
+    dbname: "data"
 reverseproxy: ""
 defaultgroupconfig:
     enable: true
