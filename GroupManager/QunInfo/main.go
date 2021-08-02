@@ -3,7 +3,7 @@ package QunInfo
 import (
 	"OPQBot-QQGroupManager/Core"
 	"errors"
-	"github.com/mcoo/OPQBot/Qzone"
+	"github.com/mcoo/OPQBot/qzone"
 	"github.com/mcoo/requests"
 	"log"
 	"net/http"
