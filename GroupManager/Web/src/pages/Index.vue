@@ -210,6 +210,24 @@
     </q-table>
   </div>
           </q-tab-panel>
+          <q-tab-panel name="entertainment">
+ <div class="q-pa-md q-gutter-y-sm column">
+   <q-toggle
+      label="签到功能"
+      v-model="selectGroupConfig.SignIn"
+    />
+     <q-toggle
+      label="名片赞功能"
+      v-model="selectGroupConfig.Zan"
+    />
+    <q-toggle
+      label="Bilibili订阅姬"
+      v-model="selectGroupConfig.Bili"
+    />
+ </div>
+   <q-btn outline @click="setGroupConfig(selectGroup.GroupId, selectGroupConfig)" class="q-mt-md">保存</q-btn>
+    <q-btn outline class="q-mt-md q-ml-sm">导出签到数据</q-btn>
+</q-tab-panel>
           <q-tab-panel name="job">
             <div class="q-col-gutter-md row items-start">
               <div class="col-12 col-md-4">
@@ -282,24 +300,6 @@
 
             </div>
           </q-tab-panel>
-<q-tab-panel name="entertainment">
- <div class="q-pa-md q-gutter-y-sm column">
-   <q-toggle
-      label="签到功能"
-      v-model="selectGroupConfig.SignIn"
-    />
-     <q-toggle
-      label="名片赞功能"
-      v-model="selectGroupConfig.Zan"
-    />
-    <q-toggle
-      label="Bilibili订阅姬"
-      v-model="selectGroupConfig.Bili"
-    />
- </div>
-   <q-btn outline @click="setGroupConfig(selectGroup.GroupId, selectGroupConfig)" class="q-mt-md">保存</q-btn>
-    <q-btn outline class="q-mt-md q-ml-sm">导出签到数据</q-btn>
-</q-tab-panel>
 
          </q-tab-panels>
 

@@ -27,8 +27,6 @@ axios.interceptors.response.use(res => {
     this.$router.replace('/login')
   }
   return res
-}, error => {
-  return Promise.reject('出错啦', error)
 })
 
 function getCookie (cname) {

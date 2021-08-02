@@ -120,7 +120,8 @@ export default {
             }
           }).catch(function (error) {
             _this.isError = true
-            _this.errorInfo = error.message
+            console.log(error.request)
+            _this.errorInfo = error.message + ' ' + error.response.data.info
             _this.passwordErr = false
           }).finally(function () {
             _this.visible = false

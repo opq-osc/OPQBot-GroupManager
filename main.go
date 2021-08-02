@@ -52,7 +52,6 @@ func main() {
 				fmt.Printf("start pprof failed on %s\n", ip)
 			}
 		}()
-
 	}
 	log.Println("QQ Group Manager -️" + version + " 编译时间 " + date)
 	androidDns.SetDns()

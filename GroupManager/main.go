@@ -7,10 +7,13 @@ import (
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Local"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/XiaoI"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Zhai"
+	"OPQBot-QQGroupManager/GroupManager/QunInfo"
 	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/utils"
 	"embed"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"github.com/kataras/iris/v12"
 	"github.com/kataras/iris/v12/sessions"
 	"github.com/mcoo/OPQBot"
@@ -62,6 +65,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		Code   string
 	}{}
 	VerifyLock := sync.Mutex{}
+	qun := QunInfo.NewQun(b)
 	err := b.AddEvent(OPQBot.EventNameOnGroupJoin, func(botQQ int64, packet *OPQBot.GroupJoinPack) {
 		Config.Lock.RLock()
 		var c Config.GroupConfig
@@ -132,6 +136,112 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			b.SetForbidden(1, c.JoinAutoShutUpTime, packet.EventMsg.FromUin, packet.EventData.UserID)
 		}
 	})
+	// 接受处理解禁功能
+	err = b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
+		if packet.FromUin != b.QQ {
+			//log.Println(packet.Content)
+			content := map[string]interface{}{}
+			contentStr := ""
+			json.Unmarshal([]byte(packet.Content), &content)
+			if value, ok := content["Content"]; ok {
+				contentStr, _ = value.(string)
+			} else {
+				contentStr = packet.Content
+			}
+			s := b.Session.SessionStart(packet.FromUin)
+			if result, err := s.GetInt("c_result"); err == nil {
+				IgroupId, err := s.Get("groupId")
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				groupId, _ := IgroupId.(int64)
+				if contentStr == "取消" {
+					s.Delete("groupId")
+					s.Delete("c_result")
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypePrivateChat,
+						ToUserUid:  packet.FromUin,
+						Content: OPQBot.SendTypeTextMsgContentPrivateChat{
+							Content: "已经取消了",
+							Group:   groupId,
+						},
+						CallbackFunc: nil,
+					})
+					//b.SendFriendTextMsg(packet.FromUin,"已经取消了！")
+					return
+				}
+				if strconv.Itoa(result) == contentStr {
+
+					err = packet.Bot.SetForbidden(1, 0, groupId, packet.FromUin)
+					if err != nil {
+						log.Error(err)
+						return
+					}
+					b.SendGroupTextMsg(groupId, fmt.Sprintf("用户%d,解除禁言", packet.FromUin))
+					//b.SendFriendTextMsg(packet.FromUin,"已经操作了！")
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypePrivateChat,
+						ToUserUid:  packet.FromUin,
+						Content: OPQBot.SendTypeTextMsgContentPrivateChat{
+							Content: "已经操作了",
+							Group:   groupId,
+						},
+						CallbackFunc: nil,
+					})
+					s.Delete("groupId")
+					s.Delete("c_result")
+				} else {
+					b.Send(OPQBot.SendMsgPack{
+						SendToType: OPQBot.SendToTypePrivateChat,
+						ToUserUid:  packet.FromUin,
+						Content: OPQBot.SendTypeTextMsgContentPrivateChat{
+							Content: "答案错误！输入“取消”退出",
+							Group:   groupId,
+						},
+						CallbackFunc: nil,
+					})
+					//b.SendFriendTextMsg(packet.FromUin,"答案错误！输入“取消”退出")
+					return
+				}
+			}
+			if find := strings.Contains(packet.Content, "解除禁言"); find {
+				cm := strings.Split(contentStr, ",")
+				if len(cm) != 2 {
+					return
+				}
+				groupId, err := strconv.ParseInt(cm[1], 10, 64)
+
+				rand.Seed(time.Now().Unix())
+				a1 := rand.Intn(100)
+				a2 := rand.Intn(100)
+				err = s.Set("c_result", a1+a2)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				err = s.Set("groupId", groupId)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypePrivateChat,
+					ToUserUid:  packet.FromUin,
+					Content: OPQBot.SendTypeTextMsgContentPrivateChat{
+						Content: fmt.Sprintf("你好,请先回答对问题才能解除禁言哟！问题:\n%s", base64.StdEncoding.EncodeToString([]byte(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d + %d = ?", a1, a2)))))),
+						Group:   groupId,
+					},
+					CallbackFunc: nil,
+				})
+				//b.SendFriendTextMsg(packet.FromUin, fmt.Sprintf("你好,请先回答对问题才能解除禁言哟！问题:\n%s",base64.StdEncoding.EncodeToString([]byte(base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d + %d = ?",a1,a2)))))))
+
+			}
+		}
+	})
+	if err != nil {
+		log.Error(err)
+	}
 	chat := Chat.StartChatCore(log.WithField("Func", "Chat"))
 	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
@@ -200,6 +310,40 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				})
 			}
 			VerifyLock.Unlock()
+			return
+		}
+		if packet.Content == "本群信息" {
+			info, err := qun.GetGroupInfo(packet.FromGroupID, 0)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			info2, err := qun.GetGroupMembersInfo(packet.FromGroupID, 0)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			s := fmt.Sprintf(
+				"本群[%d]%s人数%d\n昨日活跃数据:\n活跃人数:%d\n消息条数:%d\n加群%d人 退群%d人 申请入群%d\n最活跃的小可爱们",
+				packet.FromGroupID,
+				info.Data.GroupInfo.GroupName,
+				info.Data.GroupInfo.GroupMember,
+				info.Data.ActiveData.DataList[len(info.Data.ActiveData.DataList)-1].Number,
+				info.Data.MsgInfo.DataList[len(info.Data.MsgInfo.DataList)-1].Number,
+				info.Data.JoinData.DataList[len(info.Data.JoinData.DataList)-1].Number,
+				info.Data.ExitData.DataList[len(info.Data.ExitData.DataList)-1].Number,
+				info.Data.ApplyData.DataList[len(info.Data.ApplyData.DataList)-1].Number,
+			)
+			a := 0
+			for _, v := range info2.Data.SpeakRank {
+				if a >= 5 {
+					break
+				}
+
+				s += fmt.Sprintf("\n%s 活跃度 %d 发言条数 %d", v.Nickname, v.Active, v.MsgCount)
+				a += 1
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, s)
 			return
 		}
 		if packet.Content == "签到" {
@@ -373,7 +517,6 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 
 	if Config.CoreConfig.OPQWebConfig.Enable {
 		log.Println("启动Web 😊")
-
 		Config.Lock.Lock()
 		sess = sessions.New(sessions.Config{Cookie: "OPQWebSession"})
 		if Config.CoreConfig.OPQWebConfig.CSRF == "" {
