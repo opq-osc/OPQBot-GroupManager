@@ -5,12 +5,13 @@ go 1.16
 require (
 	github.com/Joker/hpp v1.0.0 // indirect
 	github.com/antonfisher/nested-logrus-formatter v1.3.1
-	github.com/fogleman/gg v1.3.0
+	github.com/disintegration/imaging v1.6.2
 	github.com/gaoyanpao/biliLiveHelper v0.0.0-20210205164551-dca3842ab39b
 	github.com/go-ego/gse v0.67.0
 	github.com/go-playground/webhooks/v6 v6.0.0-beta.3
 	github.com/kataras/iris/v12 v12.2.0-alpha2.0.20210427211137-fa175eb84754
 	github.com/mcoo/OPQBot v0.2.0
+	github.com/mcoo/gg v1.3.0-edit
 	github.com/mcoo/requests v0.0.2
 	github.com/mcoo/sqlite v1.1.4-fix-1
 	github.com/mcoo/wordclouds v0.0.3

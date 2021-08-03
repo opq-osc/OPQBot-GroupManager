@@ -323,28 +323,35 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				log.Error(err)
 				return
 			}
-			s := fmt.Sprintf(
-				"本群[%d]%s人数%d\n昨日活跃数据:\n活跃人数:%d\n消息条数:%d\n加群%d人 退群%d人 申请入群%d\n最活跃的小可爱们",
-				packet.FromGroupID,
-				info.Data.GroupInfo.GroupName,
-				info.Data.GroupInfo.GroupMember,
-				info.Data.ActiveData.DataList[len(info.Data.ActiveData.DataList)-1].Number,
-				info.Data.MsgInfo.DataList[len(info.Data.MsgInfo.DataList)-1].Number,
-				info.Data.JoinData.DataList[len(info.Data.JoinData.DataList)-1].Number,
-				info.Data.ExitData.DataList[len(info.Data.ExitData.DataList)-1].Number,
-				info.Data.ApplyData.DataList[len(info.Data.ApplyData.DataList)-1].Number,
-			)
-			a := 0
-			for _, v := range info2.Data.SpeakRank {
-				if a >= 5 {
-					break
-				}
-
-				s += fmt.Sprintf("\n%s 活跃度 %d 发言条数 %d", v.Nickname, v.Active, v.MsgCount)
-				a += 1
+			pic, err := draw.DrawGroupInfo(info, info2)
+			if err != nil {
+				log.Error(err)
+				return
 			}
-			b.SendGroupTextMsg(packet.FromGroupID, s)
+			b.SendGroupPicMsg(packet.FromGroupID, "", pic)
 			return
+			//s := fmt.Sprintf(
+			//	"本群[%d]%s人数%d\n昨日活跃数据:\n活跃人数:%d\n消息条数:%d\n加群%d人 退群%d人 申请入群%d\n最活跃的小可爱们",
+			//	packet.FromGroupID,
+			//	info.Data.GroupInfo.GroupName,
+			//	info.Data.GroupInfo.GroupMember,
+			//	info.Data.ActiveData.DataList[len(info.Data.ActiveData.DataList)-1].Number,
+			//	info.Data.MsgInfo.DataList[len(info.Data.MsgInfo.DataList)-1].Number,
+			//	info.Data.JoinData.DataList[len(info.Data.JoinData.DataList)-1].Number,
+			//	info.Data.ExitData.DataList[len(info.Data.ExitData.DataList)-1].Number,
+			//	info.Data.ApplyData.DataList[len(info.Data.ApplyData.DataList)-1].Number,
+			//)
+			//a := 0
+			//for _, v := range info2.Data.SpeakRank {
+			//	if a >= 5 {
+			//		break
+			//	}
+			//
+			//	s += fmt.Sprintf("\n%s 活跃度 %d 发言条数 %d", v.Nickname, v.Active, v.MsgCount)
+			//	a += 1
+			//}
+			//b.SendGroupTextMsg(packet.FromGroupID, s)
+			//return
 		}
 		if packet.Content == "签到" {
 
