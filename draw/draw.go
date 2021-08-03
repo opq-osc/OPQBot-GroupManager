@@ -24,8 +24,8 @@ var techno []byte
 //go:embed bg.png
 var bg []byte
 
-//go:embed AlibabaPuHuiTi-2-55-Regular.ttf
-var AliFont []byte
+//go:embed ArialEnUnicodeBold.ttf
+var ArialEnUnicodeBold []byte
 
 var log *logrus.Logger
 
@@ -50,7 +50,7 @@ func DrawGroupInfo(GroupInfo QunInfo.GroupInfoResult, GroupMemberInfo QunInfo.Gr
 		return nil, err
 	}
 	dc := gg.NewContextForImage(bgimg)
-	err = dc.LoadFontFaceFromBytes(AliFont, 16)
+	err = dc.LoadFontFaceFromBytes(ArialEnUnicodeBold, 10)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func DrawGroupInfo(GroupInfo QunInfo.GroupInfoResult, GroupMemberInfo QunInfo.Gr
 		dc.DrawString(text, 96, float64(196+101*a))
 		a += 1
 	}
-	dc.LoadFontFaceFromBytes(AliFont, 11)
+	dc.LoadFontFaceFromBytes(ArialEnUnicodeBold, 6)
 	dc.SetRGB(150, 150, 150)
 	log.Println(GroupInfo.Data.ActiveData)
 	text := ""
@@ -96,7 +96,7 @@ func DrawGroupInfo(GroupInfo QunInfo.GroupInfoResult, GroupMemberInfo QunInfo.Gr
 		), 390)
 	}
 
-	dc.DrawString(text, 6, 526)
+	dc.DrawString(text, 4, 526)
 	// 226- 141 + 141 -126
 	buf := new(bytes.Buffer)
 	err = png.Encode(buf, dc.Image())

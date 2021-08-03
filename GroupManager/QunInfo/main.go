@@ -198,7 +198,7 @@ func (q *Qun) GetGroupMembersInfo(groupId int64, time int) (result GroupMembersR
 		return q.GetGroupMembersInfo(groupId, time)
 	}
 	sort.Slice(result.Data.SpeakRank, func(i, j int) bool {
-		return result.Data.SpeakRank[i].Active > result.Data.SpeakRank[j].Active
+		return result.Data.SpeakRank[i].MsgCount > result.Data.SpeakRank[j].MsgCount
 	})
 	q.RetryCount = 5
 	return result, nil
