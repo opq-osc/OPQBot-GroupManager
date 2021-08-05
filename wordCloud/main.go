@@ -279,7 +279,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 }
 func (m *Module) DelOldWord() {
 	t, _ := time.ParseInLocation("2006-01-02 15:04:05", time.Now().Add(24*time.Hour).Format("2006-01-02")+" 00:00:00", time.Local)
-	_ = m.db.Where(" (? - hot_time) <= 691200", t.Unix()).Delete(&HotWord{}).Error
+	_ = m.db.Where(" (? - hot_time) >= 691200", t.Unix()).Delete(&HotWord{}).Error
 }
 func (m *Module) AddHotWord(word string, groupId int64) error {
 	var hotWord []HotWord
