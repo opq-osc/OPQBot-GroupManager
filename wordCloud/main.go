@@ -66,7 +66,7 @@ func (m *Module) DoHotWord() {
 	//segmented.LoadDictionary("./dictionary.txt")
 	for {
 		msg := <-m.MsgChannel
-		tmp := segmenter.Segment([]byte(msg.Content))
+		tmp := segmenter.Segment([]byte(OPQBot.DecodeFaceFromSentences(msg.Content, "%s")))
 		for _, v := range gse.ToSlice(tmp, false) {
 			if len([]rune(v)) > 1 {
 				err := m.AddHotWord(v, msg.FromGroupID)
@@ -131,6 +131,9 @@ func (m *Module) GetUrlPic(url string, width, height, javascriptDelay int) (stri
 func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
 	m.db = b.DB
+	b.BotCronManager.AddJob(-1, "Yiqing", "0 8,18 * * *", func() {
+		m.DelOldWord()
+	})
 	m.MsgChannel = make(chan OPQBot.GroupMsgPack, 30)
 	go m.DoHotWord()
 	err := b.DB.AutoMigrate(&HotWord{})
@@ -274,6 +277,10 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	}
 	return nil
 }
+func (m *Module) DelOldWord() {
+	t, _ := time.ParseInLocation("2006-01-02 15:04:05", time.Now().Add(24*time.Hour).Format("2006-01-02")+" 00:00:00", time.Local)
+	_ = m.db.Where(" (? - hot_time) <= 691200", t.Unix()).Delete(&HotWord{}).Error
+}
 func (m *Module) AddHotWord(word string, groupId int64) error {
 	var hotWord []HotWord
 
@@ -305,7 +312,7 @@ func (m *Module) AddHotWord(word string, groupId int64) error {
 func (m *Module) GetTodayWord(groupId int64) ([]HotWord, error) {
 	var hotWord []HotWord
 	t, _ := time.ParseInLocation("2006-01-02 15:04:05", time.Now().Add(24*time.Hour).Format("2006-01-02")+" 00:00:00", time.Local)
-	err := m.db.Where("(? - hot_time) <= 86400  AND group_id = ?", t, groupId).Limit(100).Find(&hotWord).Error
+	err := m.db.Where("(? - hot_time) <= 86400  AND group_id = ?", t.Unix(), groupId).Limit(100).Find(&hotWord).Error
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +323,7 @@ func (m *Module) GetWeeklyWord(groupId int64) ([]HotWord, error) {
 	var hotWord []HotWord
 	t, _ := time.ParseInLocation("2006-01-02 15:04:05", time.Now().Add(24*time.Hour).Format("2006-01-02")+" 00:00:00", time.Local)
 
-	err := m.db.Where("(? - hot_time) <= 604800 AND group_id = ?", t, groupId).Limit(100).Find(&hotWord).Error
+	err := m.db.Where("(? - hot_time) <= 604800 AND group_id = ?", t.Unix(), groupId).Limit(100).Find(&hotWord).Error
 	if err != nil {
 		return nil, err
 	}
