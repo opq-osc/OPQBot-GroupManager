@@ -33,6 +33,7 @@ func StartChatCore(l *logrus.Entry) Manager {
 		err := v.Init(tmp)
 		if err != nil {
 			tmp.Error(err)
+			delete(Providers, k)
 		}
 		tmp.Info("载入成功")
 	}
@@ -45,6 +46,13 @@ func StartChatCore(l *logrus.Entry) Manager {
 
 func init() {
 	Providers = make(map[string]ChatCore)
+}
+func (m *Manager) Learn(Question, Answer string, GroupId, From int64) error {
+	if v, ok := Providers["local"]; ok {
+		return v.AddAnswer(Question, Answer, GroupId, From)
+	} else {
+		return errors.New("本地聊天系统出现故障")
+	}
 }
 func (m *Manager) SetChatDB(db string) error {
 	if _, ok := Providers[db]; ok {
@@ -64,8 +72,17 @@ func (m *Manager) GetAnswer(question string, groupId, userId int64) (string, err
 			return answer, nil
 		}
 	}
-	// 联网对话数据库
+	// 联网查询默认对话数据库
 	if v, ok := Providers[m.SelectCore]; ok {
+		if answer := v.GetAnswer(question, groupId, userId); answer != "" {
+			return answer, nil
+		}
+	}
+	// 遍历其他数据库
+	for k, v := range Providers {
+		if k == "local" || k == m.SelectCore {
+			continue
+		}
 		if answer := v.GetAnswer(question, groupId, userId); answer != "" {
 			return answer, nil
 		}

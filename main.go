@@ -57,7 +57,7 @@ func main() {
 	androidDns.SetDns()
 	go CheckUpdate()
 	b := Core.Bot{BotManager: OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)}
-	err := b.AddEvent(OPQBot.EventNameOnDisconnected, func() {
+	_, err := b.AddEvent(OPQBot.EventNameOnDisconnected, func() {
 		log.Println("断开服务器")
 	})
 	if err != nil {
@@ -66,7 +66,7 @@ func main() {
 	b.BotCronManager = utils.NewBotCronManager()
 	b.BotCronManager.Start()
 	b.DB = Config.DB
-	err = b.AddEvent(OPQBot.EventNameOnConnected, func() {
+	_, err = b.AddEvent(OPQBot.EventNameOnConnected, func() {
 		log.Println("连接服务器成功")
 	})
 	if err != nil {

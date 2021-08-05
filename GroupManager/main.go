@@ -5,7 +5,8 @@ import (
 	"OPQBot-QQGroupManager/Core"
 	"OPQBot-QQGroupManager/GroupManager/Chat"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Local"
-	_ "OPQBot-QQGroupManager/GroupManager/Chat/XiaoI"
+	//_ "OPQBot-QQGroupManager/GroupManager/Chat/XiaoI"
+	_ "OPQBot-QQGroupManager/GroupManager/Chat/Moli"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Zhai"
 	"OPQBot-QQGroupManager/GroupManager/QunInfo"
 	"OPQBot-QQGroupManager/draw"
@@ -66,7 +67,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	}{}
 	VerifyLock := sync.Mutex{}
 	qun := QunInfo.NewQun(b)
-	err := b.AddEvent(OPQBot.EventNameOnGroupJoin, func(botQQ int64, packet *OPQBot.GroupJoinPack) {
+	_, err := b.AddEvent(OPQBot.EventNameOnGroupJoin, func(botQQ int64, packet *OPQBot.GroupJoinPack) {
 		Config.Lock.RLock()
 		var c Config.GroupConfig
 		if v, ok := Config.CoreConfig.GroupConfig[packet.EventMsg.FromUin]; ok {
@@ -137,7 +138,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		}
 	})
 	// 接受处理解禁功能
-	err = b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
+	_, err = b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
 		if packet.FromUin != b.QQ {
 			//log.Println(packet.Content)
 			content := map[string]interface{}{}
@@ -243,7 +244,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		log.Error(err)
 	}
 	chat := Chat.StartChatCore(log.WithField("Func", "Chat"))
-	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
+	_, err = b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
 			return
 		}
@@ -259,7 +260,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			return
 		}
 
-		if v, _ := regexp.MatchString(`[0-9]{6}`, packet.Content); v {
+		if v, _ := regexp.MatchString(`^[0-9]{6}$`, packet.Content); v {
 			VerifyLock.Lock()
 			if v1, ok := VerifyNum[strconv.FormatInt(packet.FromUserID, 10)+"|"+strconv.FormatInt(packet.FromGroupID, 10)]; ok {
 				if v1.Code == packet.Content {
@@ -486,10 +487,74 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			return
 		}
 		if packet.Content == "当前聊天数据库" {
+			if chat.SelectCore == "" {
+				b.SendGroupTextMsg(packet.FromGroupID, "当前没有设置")
+				return
+			}
 			b.SendGroupTextMsg(packet.FromGroupID, "设置聊天数据库为"+chat.SelectCore)
 			return
 		}
+		log.Println(packet.Content)
 		cm := strings.Split(packet.Content, " ")
+		if len(cm) == 2 && cm[0] == "拉黑" {
+			Config.Lock.Lock()
+			log.Println(cm)
+			if Config.CoreConfig.SuperAdminUin == packet.FromUserID {
+				if uin, err := strconv.ParseInt(cm[1], 10, 64); err == nil {
+					Config.CoreConfig.BanQQ = append(Config.CoreConfig.BanQQ, uin)
+					b.SendGroupTextMsg(packet.FromGroupID, "已经拉黑了")
+				} else {
+					log.Error(err)
+					b.SendGroupTextMsg(packet.FromGroupID, "命令有问题")
+				}
+
+			} else {
+				b.SendGroupTextMsg(packet.FromGroupID, "权限不足")
+			}
+			Config.Save()
+			Config.Lock.Unlock()
+			return
+		}
+		if len(cm) == 2 && cm[0] == "取消拉黑" {
+			Config.Lock.Lock()
+			if Config.CoreConfig.SuperAdminUin == packet.FromUserID {
+				if uin, err := strconv.ParseInt(cm[1], 10, 64); err != nil {
+					for i, v := range Config.CoreConfig.BanQQ {
+						if v == uin {
+							Config.CoreConfig.BanQQ = append(Config.CoreConfig.BanQQ[:i], Config.CoreConfig.BanQQ[i+1:]...)
+						}
+					}
+					b.SendGroupTextMsg(packet.FromGroupID, "已经拉黑了")
+				} else {
+					b.SendGroupTextMsg(packet.FromGroupID, "命令有问题")
+				}
+			} else {
+				b.SendGroupTextMsg(packet.FromGroupID, "权限不足")
+			}
+			Config.Save()
+			Config.Lock.Unlock()
+			return
+		}
+		if packet.Content == "黑名单" {
+			Config.Lock.RLock()
+			s := "黑名单列表"
+			for _, v := range Config.CoreConfig.BanQQ {
+				s += "\n" + strconv.FormatInt(v, 10)
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, s)
+			Config.Lock.RUnlock()
+			return
+		}
+		if len(cm) >= 3 && cm[0] == "教你" {
+			tmp := strings.SplitN(packet.Content, " ", 3)
+			err := chat.Learn(tmp[1], tmp[2], packet.FromGroupID, packet.FromUserID)
+			if err != nil {
+				b.SendGroupTextMsg(packet.FromGroupID, "学习出现问题")
+				return
+			}
+			b.SendGroupTextMsg(packet.FromGroupID, "已经学会了")
+			return
+		}
 		if len(cm) == 2 && cm[0] == "设置聊天数据库" {
 			err = chat.SetChatDB(cm[1])
 			if err != nil {
@@ -499,23 +564,24 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			b.SendGroupTextMsg(packet.FromGroupID, "设置聊天数据库为"+cm[1])
 			return
 		}
-		if packet.Content == "关闭聊天" {
+		if a, _ := regexp.MatchString("关闭|无路赛|吵|别说话|闭嘴", packet.Content); a {
 			Config.Lock.Lock()
-			c.EnableChat = false
-			Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
-			Config.Save()
+			if c.Enable == true {
+				c.EnableChat = false
+				b.SendGroupTextMsg(packet.FromGroupID, "关闭了聊天功能")
+				Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
+				Config.Save()
+			}
 			Config.Lock.Unlock()
-			b.SendGroupTextMsg(packet.FromGroupID, "关闭了聊天功能")
 			return
 		}
 		if c.EnableChat {
-			answer, err := chat.GetAnswer(packet.Content, packet.FromGroupID, packet.FromUserID)
+			answer, err := chat.GetAnswer(OPQBot.DecodeFaceFromSentences(packet.Content, "%s"), packet.FromGroupID, packet.FromUserID)
 			if err != nil {
 				log.Warn(err)
 				return
 			}
-
-			b.SendGroupTextMsg(packet.FromGroupID, OPQBot.MacroAt([]int64{packet.FromUserID})+answer)
+			b.SendGroupTextMsg(packet.FromGroupID, strings.ReplaceAll(answer, "[YOU]", packet.FromNickName))
 		}
 	})
 	if err != nil {

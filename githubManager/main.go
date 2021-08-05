@@ -28,7 +28,7 @@ func (m *Module) ModuleInfo() Core.ModuleInfo {
 func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
 	g := NewManager(GroupManager.App, b)
-	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
+	_, err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
 			return
 		}
@@ -86,7 +86,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		return err
 	}
 
-	err = b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
+	_, err = b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
 		s := b.Session.SessionStart(packet.FromUin)
 		if v, err := s.GetString("github"); err == nil {
 			groupidI, err := s.Get("github_groupId")

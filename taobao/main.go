@@ -37,7 +37,7 @@ func (m *Module) ModuleInfo() Core.ModuleInfo {
 func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
 
-	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
+	_, err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
 			return
 		}

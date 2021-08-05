@@ -102,7 +102,7 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 			log.Error(err)
 		}
 	}
-	err := b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
+	_, err := b.AddEvent(OPQBot.EventNameOnFriendMessage, func(qq int64, packet *OPQBot.FriendMsgPack) {
 		if packet.FromUin != b.QQ {
 			if strings.HasPrefix(packet.Content, "code=") && !p.c.Login {
 				code := strings.TrimPrefix(packet.Content, "code=")

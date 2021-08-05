@@ -42,6 +42,10 @@ type CoreConfigStruct struct {
 			Key    string
 			Secret string
 		}
+		Moli struct {
+			Key    string
+			Secret string
+		}
 	}
 	HtmlToImgUrl       string
 	DisableModule      []string

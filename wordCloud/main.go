@@ -141,7 +141,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	m.ImgServer = Config.CoreConfig.HtmlToImgUrl
 	Config.Lock.RUnlock()
 
-	err = b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
+	_, err = b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID != b.QQ {
 			if packet.MsgType == "TextMsg" {
 				m.MsgChannel <- *packet

@@ -127,7 +127,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		fmt.Println(ups)
 	})
 
-	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
+	_, err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID == botQQ {
 			return
 		}

@@ -35,7 +35,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
 	px := &pixiv.Provider{}
 	RegisterProvider(px, b, b.DB)
-	err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
+	_, err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID != b.QQ {
 			//cm := strings.Split(packet.Content, " ")
 			cm := strings.SplitN(packet.Content, " ", 2)

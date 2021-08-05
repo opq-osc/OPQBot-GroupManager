@@ -19,6 +19,7 @@ type LocalChat struct {
 	GroupId  int64
 	Question string
 	Answer   string
+	From     int64
 }
 
 func (c *Core) Init(l *logrus.Entry) error {
@@ -49,6 +50,7 @@ func (c *Core) AddAnswer(question, answer string, GroupId, userId int64) error {
 		GroupId:  GroupId,
 		Question: question,
 		Answer:   answer,
+		From:     userId,
 	}
 	if err := Config.DB.Create(&tmp).Error; err != nil {
 		return err
