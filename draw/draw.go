@@ -43,7 +43,16 @@ func GetAvatar(avatar string) (image.Image, error) {
 	}
 	return img, nil
 }
-
+func DrawCircle(img image.Image, r int) image.Image {
+	ava := imaging.Resize(img, r, r, imaging.Lanczos)
+	c := gg.NewContext(r, r)
+	// 画圆形
+	c.DrawCircle(float64(r/2), float64(r/2), float64(r/2))
+	// 对画布进行裁剪
+	c.Clip()
+	c.DrawImage(ava, 0, 0)
+	return c.Image()
+}
 func DrawGroupInfo(GroupInfo QunInfo.GroupInfoResult, GroupMemberInfo QunInfo.GroupMembersResult) ([]byte, error) {
 	bgimg, err := png.Decode(bytes.NewReader(bg))
 	if err != nil {
@@ -65,14 +74,8 @@ func DrawGroupInfo(GroupInfo QunInfo.GroupInfoResult, GroupMemberInfo QunInfo.Gr
 			log.Error()
 			continue
 		}
-		ava = imaging.Resize(ava, 64, 64, imaging.Lanczos)
-		c := gg.NewContext(64, 64)
-		// 画圆形
-		c.DrawCircle(32, 32, 32)
-		// 对画布进行裁剪
-		c.Clip()
-		c.DrawImage(ava, 0, 0)
-		dc.DrawImage(c.Image(), 16, 136+101*a)
+
+		dc.DrawImage(DrawCircle(ava, 64), 16, 136+101*a)
 
 		text := TruncateText(dc, fmt.Sprintf("%s (%s)", i.Nickname, i.Uin), 252)
 		dc.DrawString(text, 96, float64(158+101*a))

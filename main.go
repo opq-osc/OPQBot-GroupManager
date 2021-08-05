@@ -9,6 +9,7 @@ import (
 	"OPQBot-QQGroupManager/androidDns"
 	_ "OPQBot-QQGroupManager/genAndYiqin"
 	_ "OPQBot-QQGroupManager/githubManager"
+	_ "OPQBot-QQGroupManager/kiss"
 	_ "OPQBot-QQGroupManager/setu"
 	_ "OPQBot-QQGroupManager/taobao"
 	_ "OPQBot-QQGroupManager/wordCloud"
