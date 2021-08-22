@@ -39,6 +39,14 @@ type WebResult struct {
 	Info string      `json:"info"`
 	Data interface{} `json:"data"`
 }
+type AtMsg struct {
+	Content string `json:"Content"`
+	UserExt []struct {
+		QQNick string `json:"QQNick"`
+		QQUID  int64  `json:"QQUid"`
+	} `json:"UserExt"`
+	UserID []int64 `json:"UserID"`
+}
 
 var (
 	App   = iris.New()
@@ -477,13 +485,13 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			Config.Lock.RUnlock()
 			return
 		}
-		if packet.Content == "开启聊天" {
+		if a, _ := regexp.MatchString("聊天|无聊", packet.Content); a {
 			Config.Lock.Lock()
 			c.EnableChat = true
 			Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
 			Config.Save()
 			Config.Lock.Unlock()
-			b.SendGroupTextMsg(packet.FromGroupID, "打开了聊天功能")
+			b.SendGroupTextMsg(packet.FromGroupID, "你可以at我和我聊天哟😉")
 			return
 		}
 		if packet.Content == "当前聊天数据库" {
@@ -494,7 +502,6 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			b.SendGroupTextMsg(packet.FromGroupID, "设置聊天数据库为"+chat.SelectCore)
 			return
 		}
-		log.Println(packet.Content)
 		cm := strings.Split(packet.Content, " ")
 		if len(cm) == 2 && cm[0] == "拉黑" {
 			Config.Lock.Lock()
@@ -575,13 +582,57 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			Config.Lock.Unlock()
 			return
 		}
-		if c.EnableChat {
-			answer, err := chat.GetAnswer(OPQBot.DecodeFaceFromSentences(packet.Content, "%s"), packet.FromGroupID, packet.FromUserID)
+		if c.EnableChat && packet.MsgType == "AtMsg" {
+			//var atInfo AtMsg
+			//err := json.Unmarshal([]byte(packet.Content),&atInfo)
+			//if err != nil{
+			//	log.Error(err)
+			//	return
+			//}
+			atInfo, err := OPQBot.ParserGroupAtMsg(*packet)
+			if err != nil {
+				log.Error(err)
+				return
+			}
+			atInfo = atInfo.Clean()
+			var atme = false
+			for _, v := range atInfo.UserID {
+				if v == b.QQ {
+					atme = true
+					break
+				}
+			}
+			if !atme {
+				return
+			}
+			for _, v := range atInfo.UserExt {
+				atInfo.Content = strings.TrimSpace(strings.ReplaceAll(atInfo.Content, "@"+v.QQNick, ""))
+			}
+
+			answer, err := chat.GetAnswer(OPQBot.DecodeFaceFromSentences(atInfo.Content, "%s"), packet.FromGroupID, packet.FromUserID)
 			if err != nil {
 				log.Warn(err)
 				return
 			}
-			b.SendGroupTextMsg(packet.FromGroupID, strings.ReplaceAll(answer, "[YOU]", packet.FromNickName))
+			b.Send(OPQBot.SendMsgPack{
+				SendToType: OPQBot.SendToTypeGroup,
+				ToUserUid:  packet.FromGroupID,
+				Content: OPQBot.SendTypeReplyContent{
+					ReplayInfo: struct {
+						MsgSeq     int    `json:"MsgSeq"`
+						MsgTime    int    `json:"MsgTime"`
+						UserID     int64  `json:"UserID"`
+						RawContent string `json:"RawContent"`
+					}{MsgSeq: packet.MsgSeq,
+						MsgTime:    packet.MsgTime,
+						UserID:     packet.FromUserID,
+						RawContent: atInfo.Content,
+					},
+					Content: strings.ReplaceAll(answer, "[YOU]", packet.FromNickName),
+				},
+				CallbackFunc: nil,
+			})
+			//b.SendGroupTextMsg(packet.FromGroupID, )
 		}
 	})
 	if err != nil {
@@ -644,6 +695,32 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			}
 			// log.Println(r.URL.Path)
 			router.ServeHTTP(w, r)
+		})
+		App.Get("/api/chat", func(ctx iris.Context) {
+			word := ctx.URLParamDefault("s", "")
+			if word == "" {
+				ctx.JSON(WebResult{
+					Code: 0,
+					Info: "success",
+					Data: "你想要问米娅什么事情呢？？",
+				})
+				return
+			}
+			a, err := chat.GetAnswer(word, 0, 0)
+			if err != nil {
+				ctx.JSON(WebResult{
+					Code: 1,
+					Info: "error",
+					Data: err.Error(),
+				})
+				return
+			}
+			ctx.JSON(WebResult{
+				Code: 0,
+				Info: "success",
+				Data: a,
+			})
+			return
 		})
 		App.Get("/api/csrf", func(ctx iris.Context) {
 			s := sess.Start(ctx)
@@ -1146,7 +1223,27 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				})
 			})
 		}
+		// App 相关接口实现
+		needAppAuth := App.Party("/api/app", requireAppLogin)
+		{
+			needAppAuth.Get("/status", func(ctx iris.Context) {
+				userInfo, _ := b.GetUserInfo(b.QQ)
+				ctx.JSON(userInfo)
+			})
+			needAppAuth.Get("/plugins", func(ctx iris.Context) {
+				plugins := []Core.ModuleInfo{}
+				log.Info(Core.Modules)
+				for _, v := range Core.Modules {
+					plugins = append(plugins, v.ModuleInfo())
+				}
+				ctx.JSON(WebResult{
+					Code: 0,
+					Info: "success",
+					Data: plugins,
+				})
 
+			})
+		}
 		go func() {
 			_ = <-Start
 			App.Logger().Prefix = "[Web]"
@@ -1197,6 +1294,17 @@ func BlackGroupList(botQQ int64, packet *OPQBot.GroupMsgPack) {
 		packet.Next(botQQ, packet)
 	}
 }
+func requireAppLogin(ctx iris.Context) {
+	ctx.Next()
+	return
+	s := sess.Start(ctx)
+	if s.GetBooleanDefault("appAuth", false) {
+		ctx.Next()
+	} else {
+		_, _ = ctx.JSON(WebResult{Code: 10010, Info: "App 未登录!", Data: nil})
+		return
+	}
+}
 func requireAuth(ctx iris.Context) {
 	s := sess.Start(ctx)
 	if s.GetBooleanDefault("auth", false) {
@@ -1224,10 +1332,13 @@ func beforeCsrf(ctx iris.Context) {
 			ctx.Next()
 		} else {
 			// log.Println(key, "-", ctx.FormValue("csrfToken"))
-			if strings.HasPrefix(ctx.Path(), "/github/webhook") {
-				ctx.Next()
-				return
+			for _, v := range CsrfWhiteList {
+				if strings.HasPrefix(ctx.Path(), v) {
+					ctx.Next()
+					return
+				}
 			}
+
 			ctx.StatusCode(419)
 			_, _ = ctx.JSON(WebResult{Code: 419, Info: "CSRF Error!", Data: nil})
 			return
@@ -1235,4 +1346,9 @@ func beforeCsrf(ctx iris.Context) {
 	} else {
 		ctx.Next()
 	}
+}
+
+var CsrfWhiteList = []string{
+	"/github/webhook",
+	"/api/kiss",
 }

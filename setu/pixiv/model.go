@@ -57,6 +57,64 @@ type LoginSuccessResult struct {
 		} `json:"user"`
 	} `json:"response"`
 }
+type UserResult struct {
+	UserPreviews []struct {
+		User struct {
+			Id               int    `json:"id"`
+			Name             string `json:"name"`
+			Account          string `json:"account"`
+			ProfileImageUrls struct {
+				Medium string `json:"medium"`
+			} `json:"profile_image_urls"`
+			IsFollowed bool `json:"is_followed"`
+		} `json:"user"`
+		Illusts []struct {
+			Id        int    `json:"id"`
+			Title     string `json:"title"`
+			Type      string `json:"type"`
+			ImageUrls struct {
+				SquareMedium string `json:"square_medium"`
+				Medium       string `json:"medium"`
+				Large        string `json:"large"`
+			} `json:"image_urls"`
+			Caption  string `json:"caption"`
+			Restrict int    `json:"restrict"`
+			User     struct {
+				Id               int    `json:"id"`
+				Name             string `json:"name"`
+				Account          string `json:"account"`
+				ProfileImageUrls struct {
+					Medium string `json:"medium"`
+				} `json:"profile_image_urls"`
+				IsFollowed bool `json:"is_followed"`
+			} `json:"user"`
+			Tags []struct {
+				Name           string  `json:"name"`
+				TranslatedName *string `json:"translated_name"`
+			} `json:"tags"`
+			Tools          []interface{} `json:"tools"`
+			CreateDate     time.Time     `json:"create_date"`
+			PageCount      int           `json:"page_count"`
+			Width          int           `json:"width"`
+			Height         int           `json:"height"`
+			SanityLevel    int           `json:"sanity_level"`
+			XRestrict      int           `json:"x_restrict"`
+			Series         interface{}   `json:"series"`
+			MetaSinglePage struct {
+				OriginalImageUrl string `json:"original_image_url"`
+			} `json:"meta_single_page"`
+			MetaPages      []interface{} `json:"meta_pages"`
+			TotalView      int           `json:"total_view"`
+			TotalBookmarks int           `json:"total_bookmarks"`
+			IsBookmarked   bool          `json:"is_bookmarked"`
+			Visible        bool          `json:"visible"`
+			IsMuted        bool          `json:"is_muted"`
+		} `json:"illusts"`
+		Novels  []interface{} `json:"novels"`
+		IsMuted bool          `json:"is_muted"`
+	} `json:"user_previews"`
+	NextUrl interface{} `json:"next_url"`
+}
 type IllustResult struct {
 	Illusts []struct {
 		ID        int    `json:"id"`
