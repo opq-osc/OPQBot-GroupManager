@@ -57,7 +57,7 @@ func main() {
 	log.Println("QQ Group Manager -️" + version + " 编译时间 " + date)
 	androidDns.SetDns()
 	go CheckUpdate()
-	b := Core.Bot{BotManager: OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)}
+	b := Core.Bot{Modules: map[string]*Core.Module{}, BotManager: OPQBot.NewBotManager(Config.CoreConfig.OPQBotConfig.QQ, Config.CoreConfig.OPQBotConfig.Url)}
 	_, err := b.AddEvent(OPQBot.EventNameOnDisconnected, func() {
 		log.Println("断开服务器")
 	})

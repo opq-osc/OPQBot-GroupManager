@@ -256,18 +256,18 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					colors = append(colors, c)
 				}
 
-				b.PrintMemStats()
+				//b.PrintMemStats()
 				img := wordclouds.NewWordcloud(hotMap, wordclouds.FontMaxSize(200), wordclouds.FontMinSize(40), wordclouds.FontFile("./font.ttf"),
 					wordclouds.Height(1324),
 					wordclouds.Width(1324), wordclouds.Colors(colors)).Draw()
-				b.PrintMemStats()
+				//b.PrintMemStats()
 				buf := new(bytes.Buffer)
 				err = png.Encode(buf, img)
 				if err != nil {
 					log.Error(err)
 					return
 				}
-				b.PrintMemStats()
+				//b.PrintMemStats()
 				b.SendGroupPicMsg(packet.FromGroupID, sendMsg, buf.Bytes())
 			}
 		}

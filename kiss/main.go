@@ -37,10 +37,11 @@ var (
 
 func (m *Module) ModuleInfo() Core.ModuleInfo {
 	return Core.ModuleInfo{
-		Name:        "Kiss",
-		Author:      "enjoy",
-		Description: "嘿嘿嘿",
-		Version:     0,
+		Name:          "Kiss",
+		Author:        "enjoy",
+		Description:   "嘿嘿嘿",
+		Version:       0,
+		RequireModule: []string{"群管理插件"},
 	}
 }
 
@@ -131,6 +132,53 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		}
 		pics = append(pics, pic)
 	}
+	//GroupManager.App.Post("/api/kiss", func(ctx iris.Context) {
+	//	srcPic := ctx.FormValueDefault("src","")
+	//	targetPic := ctx.FormValueDefault("target","")
+	//	if srcPic == "" || targetPic == "" {
+	//		ctx.JSON(GroupManager.WebResult{
+	//			Code: 1,
+	//			Info: "error",
+	//			Data: "字段不匹配",
+	//		})
+	//		return
+	//	}
+	//	avaTmp1, err := mydraw.GetAvatar(srcPic)
+	//	if err != nil {
+	//		ctx.JSON(GroupManager.WebResult{
+	//			Code: 1,
+	//			Info: "error",
+	//			Data: err.Error(),
+	//		})
+	//		return
+	//	}
+	//	avaTmp2, err := mydraw.GetAvatar(targetPic)
+	//	if err != nil {
+	//		ctx.JSON(GroupManager.WebResult{
+	//			Code: 1,
+	//			Info: "error",
+	//			Data: err.Error(),
+	//		})
+	//		return
+	//	}
+	//	gifPic := DrawKiss(mydraw.DrawCircle(avaTmp1, 40), mydraw.DrawCircle(avaTmp2, 50))
+	//	jsonPic,err	 := ctx.URLParamBool("json")
+	//	if err != nil {
+	//		jsonPic = true
+	//	}
+	//	if jsonPic {
+	//		ctx.JSON(GroupManager.WebResult{
+	//			Code: 0,
+	//			Info: "success",
+	//			Data: base64.StdEncoding.EncodeToString(gifPic),
+	//		})
+	//	} else {
+	//		ctx.StatusCode(200)
+	//		ctx.Header("content-type", "image/gif")
+	//		ctx.Write(gifPic)
+	//	}
+	//
+	//})
 	_, err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID != b.QQ {
 			if packet.MsgType == "AtMsg" && strings.Contains(packet.Content, "kiss") {

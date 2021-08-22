@@ -33,7 +33,7 @@ func (c *Core) Init(l *logrus.Entry) error {
 
 func (c *Core) GetAnswer(question string, GroupId, userId int64) string {
 	var answers []LocalChat
-	if err := Config.DB.Where("group_id = ? AND question LIKE ?", GroupId, question).Find(&answers).Error; err != nil {
+	if err := Config.DB.Where("question LIKE ?", question).Find(&answers).Error; err != nil {
 		log.Error(err)
 		return ""
 	}

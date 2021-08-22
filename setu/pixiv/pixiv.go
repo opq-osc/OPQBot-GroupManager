@@ -7,12 +7,16 @@ import (
 	"OPQBot-QQGroupManager/utils"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
+	"io"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +35,58 @@ type Provider struct {
 	db *gorm.DB
 }
 
+func (p *Provider) ImportPic() {
+	fs, _ := os.Open("./setuDoing.json")
+	r := csv.NewReader(fs)
+	for {
+		row, err := r.Read()
+		if err != nil && err != io.EOF {
+			log.Fatalf("can not read, err is %+v", err)
+		}
+		if err == io.EOF {
+			break
+		}
+		id, err := strconv.Atoi(row[0])
+		if err != nil {
+			continue
+		}
+		aid, err := strconv.Atoi(row[3])
+		if err != nil {
+			continue
+		}
+		var i = 0
+		if p.PicInDB(row[4]) {
+			log.Warn("图片已存在！")
+			continue
+		}
+		tmp := setucore.Pic{
+			Id:             id,
+			Page:           i,
+			Title:          row[1],
+			Author:         row[2],
+			AuthorID:       aid,
+			OriginalPicUrl: row[4],
+			Tag:            row[5],
+			R18:            row[6] == "True",
+		}
+		for {
+			if err1 := p.AddPicToDB(tmp); err1 == nil || err1.Error() != "该图片在数据库中已存在！" {
+				break
+			}
+			i += 1
+			tmp = setucore.Pic{
+				Id:             id,
+				Page:           i,
+				Title:          row[1],
+				Author:         row[2],
+				AuthorID:       aid,
+				OriginalPicUrl: row[4],
+				Tag:            row[5],
+				R18:            row[6] == "True",
+			}
+		}
+	}
+}
 func (p *Provider) autoGetPic() {
 	log.Info("自动获取Pixiv图片排行榜")
 	result, err := p.c.GetDailyIllust()
@@ -86,6 +142,7 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 	autoGetPic := Config.CoreConfig.SetuConfig.AutoGetPic
 	Config.Lock.RUnlock()
 	p.db = db
+	//p.ImportPic()
 	if p.c.refreshToken == "" {
 		p.c.GenerateLoginUrl()
 	} else {
@@ -123,26 +180,203 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 }
 func (p *Provider) SearchPicFromDB(word string, r18 bool, num int) (pics []setucore.Pic, e error) {
 	if word == "" {
-		e = p.db.Where("r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
+		e = p.db.Where("r18 = ? AND last_send_time < ?", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
 		return
 	}
 	e = p.db.Where("tag LIKE ? AND r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
 	return
 }
+func (p *Provider) SearchUserPicFromDB(word, userId string, r18 bool, num int) (pics []setucore.Pic, e error) {
+	if userId != "" {
+		e = p.db.Where("r18 = ? AND last_send_time < ? AND author_id = ?", r18, time.Now().Unix()-1800, userId).Limit(num).Order("last_send_time asc").Find(&pics).Error
+		return
+	}
+	e = p.db.Where("author LIKE ? AND r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
+	return
+}
 func (p *Provider) AddPicToDB(pic setucore.Pic) error {
 	var num int64
-	p.db.Model(&pic).Where("id = ?", pic.Id).Count(&num)
+	p.db.Model(&pic).Where("id = ? AND page = ?", pic.Id, pic.Page).Count(&num)
 	if num > 0 {
 		return errors.New("该图片在数据库中已存在！")
 	}
 	return p.db.Create(&pic).Error
 }
-func (p *Provider) SetPicSendTime(pics []setucore.Pic) {
-	var sendPicId []int
-	for _, v := range pics {
-		sendPicId = append(sendPicId, v.Id)
+func (p *Provider) PicInDB(picUrl string) bool {
+	var num int64
+	p.db.Model(&setucore.Pic{}).Where("original_pic_url = ?", picUrl).Count(&num)
+	if num > 0 {
+		return true
 	}
-	p.db.Model(&setucore.Pic{}).Where("id IN ?", sendPicId).Updates(&setucore.Pic{LastSendTime: time.Now().Unix()})
+	return false
+}
+func (p *Provider) SetPicSendTime(pics []setucore.Pic) {
+	for _, v := range pics {
+		p.db.Model(&setucore.Pic{}).Where("id = ? AND page = ?", v.Id, v.Page).Updates(&setucore.Pic{LastSendTime: time.Now().Unix()})
+	}
+
+}
+func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]setucore.Pic, error) {
+	dbPic, err := p.SearchUserPicFromDB(word, userId, r18, num)
+	if err != nil {
+		log.Warn(err)
+		return nil, err
+	}
+	if len(dbPic) < num {
+		log.Info("本地数据库数据量不够，联网获取中...")
+		if userId != "" {
+			result, err := p.c.GetUserPics(userId)
+			if err != nil {
+				log.Warn(err)
+			}
+			addPicNum := 0
+			for _, v := range result.Illusts {
+				originPicUrl := ""
+				var tag []string
+				tagHasR18 := false
+				for _, v1 := range v.Tags {
+					tmp := ""
+					if v1.TranslatedName != "" {
+						tmp = v1.TranslatedName
+					} else {
+						tmp = v1.Name
+					}
+					if tmp == "R18" || tmp == "R-18" {
+						tagHasR18 = true
+					}
+					tag = append(tag, tmp)
+				}
+				if v.PageCount == 1 {
+					originPicUrl = v.MetaSinglePage.OriginalImageURL
+					tmp := setucore.Pic{
+						Id:             v.ID,
+						Page:           0,
+						Title:          v.Title,
+						Author:         v.User.Name,
+						AuthorID:       v.User.ID,
+						OriginalPicUrl: originPicUrl,
+						Tag:            strings.Join(tag, ","),
+						R18:            v.XRestrict >= 1 || tagHasR18,
+					}
+					err := p.AddPicToDB(tmp)
+					if err != nil {
+						//log.Warn(err)
+						continue
+					}
+					addPicNum += 1
+				} else {
+					for i, v1 := range v.MetaPages {
+						originPicUrl = v1.ImageUrls.Original
+						tmp := setucore.Pic{
+							Id:             v.ID,
+							Page:           i,
+							Title:          v.Title,
+							Author:         v.User.Name,
+							AuthorID:       v.User.ID,
+							OriginalPicUrl: originPicUrl,
+							Tag:            strings.Join(tag, ","),
+							R18:            v.XRestrict >= 1 || tagHasR18,
+						}
+						err := p.AddPicToDB(tmp)
+						if err != nil {
+							//log.Warn(err)
+							continue
+						}
+						addPicNum += 1
+					}
+				}
+			}
+			log.Info("联网添加到本地数据库数据关于作者", word, "的记录数量为:", addPicNum)
+			dbPic, err = p.SearchUserPicFromDB(word, userId, r18, num)
+			if err != nil {
+				log.Warn(err)
+				return nil, err
+			}
+		}
+		if word != "" {
+			users, err := p.c.SearchUser(word)
+			if err != nil {
+				log.Warn(err)
+				return nil, err
+			}
+			if len(users.UserPreviews) == 0 {
+				return nil, errors.New("没有找到该用户")
+			}
+			userId = strconv.Itoa(users.UserPreviews[0].User.Id)
+			result, err := p.c.GetUserPics(userId)
+			if err != nil {
+				log.Warn(err)
+			}
+			addPicNum := 0
+			for _, v := range result.Illusts {
+				originPicUrl := ""
+				var tag []string
+				tagHasR18 := false
+				for _, v1 := range v.Tags {
+					tmp := ""
+					if v1.TranslatedName != "" {
+						tmp = v1.TranslatedName
+					} else {
+						tmp = v1.Name
+					}
+					if tmp == "R18" || tmp == "R-18" {
+						tagHasR18 = true
+					}
+					tag = append(tag, tmp)
+				}
+				if v.PageCount == 1 {
+					originPicUrl = v.MetaSinglePage.OriginalImageURL
+					tmp := setucore.Pic{
+						Id:             v.ID,
+						Page:           0,
+						Title:          v.Title,
+						Author:         v.User.Name,
+						AuthorID:       v.User.ID,
+						OriginalPicUrl: originPicUrl,
+						Tag:            strings.Join(tag, ","),
+						R18:            v.XRestrict >= 1 || tagHasR18,
+					}
+					err := p.AddPicToDB(tmp)
+					if err != nil {
+						//log.Warn(err)
+						continue
+					}
+					addPicNum += 1
+				} else {
+					for i, v1 := range v.MetaPages {
+						originPicUrl = v1.ImageUrls.Original
+						tmp := setucore.Pic{
+							Id:             v.ID,
+							Page:           i,
+							Title:          v.Title,
+							Author:         v.User.Name,
+							AuthorID:       v.User.ID,
+							OriginalPicUrl: originPicUrl,
+							Tag:            strings.Join(tag, ","),
+							R18:            v.XRestrict >= 1 || tagHasR18,
+						}
+						err := p.AddPicToDB(tmp)
+						if err != nil {
+							//log.Warn(err)
+							continue
+						}
+						addPicNum += 1
+					}
+				}
+			}
+			log.Info("联网添加到本地数据库数据关于作者", word, "的记录数量为:", addPicNum)
+			dbPic, err = p.SearchUserPicFromDB(word, userId, r18, num)
+			if err != nil {
+				log.Warn(err)
+				return nil, err
+			}
+		}
+
+	}
+	if len(dbPic) > 0 {
+		p.SetPicSendTime(dbPic)
+	}
+	return dbPic, nil
 }
 func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, error) {
 	dbPic, err := p.SearchPicFromDB(word, r18, num)
@@ -159,11 +393,6 @@ func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, er
 		addPicNum := 0
 		for _, v := range result.Illusts {
 			originPicUrl := ""
-			if v.PageCount == 1 {
-				originPicUrl = v.MetaSinglePage.OriginalImageURL
-			} else {
-				originPicUrl = v.MetaPages[0].ImageUrls.Original
-			}
 			var tag []string
 			tagHasR18 := false
 			for _, v1 := range v.Tags {
@@ -178,21 +407,45 @@ func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, er
 				}
 				tag = append(tag, tmp)
 			}
-			tmp := setucore.Pic{
-				Id:             v.ID,
-				Title:          v.Title,
-				Author:         v.User.Name,
-				AuthorID:       v.User.ID,
-				OriginalPicUrl: originPicUrl,
-				Tag:            strings.Join(tag, ","),
-				R18:            v.XRestrict >= 1 || tagHasR18,
+			if v.PageCount == 1 {
+				originPicUrl = v.MetaSinglePage.OriginalImageURL
+				tmp := setucore.Pic{
+					Id:             v.ID,
+					Page:           0,
+					Title:          v.Title,
+					Author:         v.User.Name,
+					AuthorID:       v.User.ID,
+					OriginalPicUrl: originPicUrl,
+					Tag:            strings.Join(tag, ","),
+					R18:            v.XRestrict >= 1 || tagHasR18,
+				}
+				err := p.AddPicToDB(tmp)
+				if err != nil {
+					//log.Warn(err)
+					continue
+				}
+				addPicNum += 1
+			} else {
+				for i, v1 := range v.MetaPages {
+					originPicUrl = v1.ImageUrls.Original
+					tmp := setucore.Pic{
+						Id:             v.ID,
+						Page:           i,
+						Title:          v.Title,
+						Author:         v.User.Name,
+						AuthorID:       v.User.ID,
+						OriginalPicUrl: originPicUrl,
+						Tag:            strings.Join(tag, ","),
+						R18:            v.XRestrict >= 1 || tagHasR18,
+					}
+					err := p.AddPicToDB(tmp)
+					if err != nil {
+						//log.Warn(err)
+						continue
+					}
+					addPicNum += 1
+				}
 			}
-			err := p.AddPicToDB(tmp)
-			if err != nil {
-				//log.Warn(err)
-				continue
-			}
-			addPicNum += 1
 		}
 		log.Info("联网添加到本地数据库数据关于", word, "的记录数量为:", addPicNum)
 		dbPic, err = p.SearchPicFromDB(word, r18, num)
@@ -367,6 +620,33 @@ func (c *Client) SearchIllust(word string) (result IllustResult, err error) {
 		req.Proxy(c.Proxy)
 	}
 	res, err = req.Get(fmt.Sprintf("https://app-api.pixiv.net/v1/search/popular-preview/illust?word=%s&search_target=partial_match_for_tags&sort=date_desc&filter=for_ios", word), c.GetHeader())
+	if err != nil {
+		return
+	}
+	err = res.Json(&result)
+	return
+}
+func (c *Client) SearchUser(word string) (result UserResult, err error) {
+	var res *requests.Response
+	req := requests.Requests()
+	if c.Proxy != "" {
+		req.Proxy(c.Proxy)
+	}
+	res, err = req.Get(fmt.Sprintf("https://app-api.pixiv.net/v1/search/user?filter=for_android&word=%s", word), c.GetHeader())
+	if err != nil {
+		return
+	}
+	err = res.Json(&result)
+	return
+}
+func (c *Client) GetUserPics(userId string) (result IllustResult, err error) {
+	log.Info(userId)
+	var res *requests.Response
+	req := requests.Requests()
+	if c.Proxy != "" {
+		req.Proxy(c.Proxy)
+	}
+	res, err = req.Get(fmt.Sprintf("https://app-api.pixiv.net/v1/user/illusts?user_id=%s&filter=for_ios", userId), c.GetHeader())
 	if err != nil {
 		return
 	}
