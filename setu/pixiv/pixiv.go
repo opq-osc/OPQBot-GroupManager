@@ -13,7 +13,6 @@ import (
 	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 	"io"
 	"os"
 	"strconv"
@@ -31,8 +30,7 @@ var (
 )
 
 type Provider struct {
-	c  Client
-	db *gorm.DB
+	c Client
 }
 
 func (p *Provider) ImportPic() {
@@ -55,7 +53,7 @@ func (p *Provider) ImportPic() {
 			continue
 		}
 		var i = 0
-		if p.PicInDB(row[4]) {
+		if setucore.PicInDB(row[4]) {
 			log.Warn("图片已存在！")
 			continue
 		}
@@ -70,7 +68,7 @@ func (p *Provider) ImportPic() {
 			R18:            row[6] == "True",
 		}
 		for {
-			if err1 := p.AddPicToDB(tmp); err1 == nil || err1.Error() != "该图片在数据库中已存在！" {
+			if err1 := setucore.AddPicToDB(tmp); err1 == nil || err1.Error() != "该图片在数据库中已存在！" {
 				break
 			}
 			i += 1
@@ -124,7 +122,7 @@ func (p *Provider) autoGetPic() {
 			Tag:            strings.Join(tag, ","),
 			R18:            v.XRestrict >= 1 || tagHasR18,
 		}
-		err := p.AddPicToDB(tmp)
+		err := setucore.AddPicToDB(tmp)
 		if err != nil {
 			//log.Warn(err)
 			continue
@@ -133,15 +131,13 @@ func (p *Provider) autoGetPic() {
 	}
 	log.Info("联网添加到本地数据库数据图片数量为:", addPicNum)
 }
-func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
+func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot) {
 	log = l
-	db.AutoMigrate(&setucore.Pic{})
 	Config.Lock.RLock()
 	p.c.Proxy = Config.CoreConfig.SetuConfig.PixivProxy
 	p.c.refreshToken = Config.CoreConfig.SetuConfig.PixivRefreshToken
 	autoGetPic := Config.CoreConfig.SetuConfig.AutoGetPic
 	Config.Lock.RUnlock()
-	p.db = db
 	//p.ImportPic()
 	if p.c.refreshToken == "" {
 		p.c.GenerateLoginUrl()
@@ -178,46 +174,8 @@ func (p *Provider) InitProvider(l *logrus.Entry, b *Core.Bot, db *gorm.DB) {
 		log.Error(err)
 	}
 }
-func (p *Provider) SearchPicFromDB(word string, r18 bool, num int) (pics []setucore.Pic, e error) {
-	if word == "" {
-		e = p.db.Where("r18 = ? AND last_send_time < ?", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
-		return
-	}
-	e = p.db.Where("tag LIKE ? AND r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
-	return
-}
-func (p *Provider) SearchUserPicFromDB(word, userId string, r18 bool, num int) (pics []setucore.Pic, e error) {
-	if userId != "" {
-		e = p.db.Where("r18 = ? AND last_send_time < ? AND author_id = ?", r18, time.Now().Unix()-1800, userId).Limit(num).Order("last_send_time asc").Find(&pics).Error
-		return
-	}
-	e = p.db.Where("author LIKE ? AND r18 = ? AND last_send_time < ?", "%"+word+"%", r18, time.Now().Unix()-1800).Limit(num).Order("last_send_time asc").Find(&pics).Error
-	return
-}
-func (p *Provider) AddPicToDB(pic setucore.Pic) error {
-	var num int64
-	p.db.Model(&pic).Where("id = ? AND page = ?", pic.Id, pic.Page).Count(&num)
-	if num > 0 {
-		return errors.New("该图片在数据库中已存在！")
-	}
-	return p.db.Create(&pic).Error
-}
-func (p *Provider) PicInDB(picUrl string) bool {
-	var num int64
-	p.db.Model(&setucore.Pic{}).Where("original_pic_url = ?", picUrl).Count(&num)
-	if num > 0 {
-		return true
-	}
-	return false
-}
-func (p *Provider) SetPicSendTime(pics []setucore.Pic) {
-	for _, v := range pics {
-		p.db.Model(&setucore.Pic{}).Where("id = ? AND page = ?", v.Id, v.Page).Updates(&setucore.Pic{LastSendTime: time.Now().Unix()})
-	}
-
-}
 func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]setucore.Pic, error) {
-	dbPic, err := p.SearchUserPicFromDB(word, userId, r18, num)
+	dbPic, err := setucore.SearchUserPicFromDB(word, userId, r18, num)
 	if err != nil {
 		log.Warn(err)
 		return nil, err
@@ -258,7 +216,7 @@ func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]
 						Tag:            strings.Join(tag, ","),
 						R18:            v.XRestrict >= 1 || tagHasR18,
 					}
-					err := p.AddPicToDB(tmp)
+					err := setucore.AddPicToDB(tmp)
 					if err != nil {
 						//log.Warn(err)
 						continue
@@ -277,7 +235,7 @@ func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]
 							Tag:            strings.Join(tag, ","),
 							R18:            v.XRestrict >= 1 || tagHasR18,
 						}
-						err := p.AddPicToDB(tmp)
+						err := setucore.AddPicToDB(tmp)
 						if err != nil {
 							//log.Warn(err)
 							continue
@@ -287,7 +245,7 @@ func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]
 				}
 			}
 			log.Info("联网添加到本地数据库数据关于作者", word, "的记录数量为:", addPicNum)
-			dbPic, err = p.SearchUserPicFromDB(word, userId, r18, num)
+			dbPic, err = setucore.SearchUserPicFromDB(word, userId, r18, num)
 			if err != nil {
 				log.Warn(err)
 				return nil, err
@@ -336,7 +294,7 @@ func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]
 						Tag:            strings.Join(tag, ","),
 						R18:            v.XRestrict >= 1 || tagHasR18,
 					}
-					err := p.AddPicToDB(tmp)
+					err := setucore.AddPicToDB(tmp)
 					if err != nil {
 						//log.Warn(err)
 						continue
@@ -355,7 +313,7 @@ func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]
 							Tag:            strings.Join(tag, ","),
 							R18:            v.XRestrict >= 1 || tagHasR18,
 						}
-						err := p.AddPicToDB(tmp)
+						err := setucore.AddPicToDB(tmp)
 						if err != nil {
 							//log.Warn(err)
 							continue
@@ -365,7 +323,7 @@ func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]
 				}
 			}
 			log.Info("联网添加到本地数据库数据关于作者", word, "的记录数量为:", addPicNum)
-			dbPic, err = p.SearchUserPicFromDB(word, userId, r18, num)
+			dbPic, err = setucore.SearchUserPicFromDB(word, userId, r18, num)
 			if err != nil {
 				log.Warn(err)
 				return nil, err
@@ -374,12 +332,12 @@ func (p *Provider) SearchPicFromUser(word, userId string, r18 bool, num int) ([]
 
 	}
 	if len(dbPic) > 0 {
-		p.SetPicSendTime(dbPic)
+		setucore.SetPicSendTime(dbPic)
 	}
 	return dbPic, nil
 }
 func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, error) {
-	dbPic, err := p.SearchPicFromDB(word, r18, num)
+	dbPic, err := setucore.SearchPicFromDB(word, r18, num)
 	if err != nil {
 		log.Warn(err)
 		return nil, err
@@ -419,7 +377,7 @@ func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, er
 					Tag:            strings.Join(tag, ","),
 					R18:            v.XRestrict >= 1 || tagHasR18,
 				}
-				err := p.AddPicToDB(tmp)
+				err := setucore.AddPicToDB(tmp)
 				if err != nil {
 					//log.Warn(err)
 					continue
@@ -438,7 +396,7 @@ func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, er
 						Tag:            strings.Join(tag, ","),
 						R18:            v.XRestrict >= 1 || tagHasR18,
 					}
-					err := p.AddPicToDB(tmp)
+					err := setucore.AddPicToDB(tmp)
 					if err != nil {
 						//log.Warn(err)
 						continue
@@ -448,14 +406,14 @@ func (p *Provider) SearchPic(word string, r18 bool, num int) ([]setucore.Pic, er
 			}
 		}
 		log.Info("联网添加到本地数据库数据关于", word, "的记录数量为:", addPicNum)
-		dbPic, err = p.SearchPicFromDB(word, r18, num)
+		dbPic, err = setucore.SearchPicFromDB(word, r18, num)
 		if err != nil {
 			log.Warn(err)
 			return nil, err
 		}
 	}
 	if len(dbPic) > 0 {
-		p.SetPicSendTime(dbPic)
+		setucore.SetPicSendTime(dbPic)
 	}
 	return dbPic, nil
 }
