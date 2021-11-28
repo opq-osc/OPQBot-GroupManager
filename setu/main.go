@@ -1,8 +1,10 @@
 package setu
 
 import (
+	"OPQBot-QQGroupManager/Config"
 	"OPQBot-QQGroupManager/Core"
 	"OPQBot-QQGroupManager/GroupManager"
+	"OPQBot-QQGroupManager/setu/lolicon"
 	"OPQBot-QQGroupManager/setu/pixiv"
 	"OPQBot-QQGroupManager/setu/setucore"
 	"encoding/base64"
@@ -11,7 +13,6 @@ import (
 	"github.com/mcoo/OPQBot"
 	"github.com/mcoo/requests"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 	"regexp"
 	"strconv"
 	"strings"
@@ -36,12 +37,42 @@ func (m *Module) ModuleInfo() Core.ModuleInfo {
 }
 func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 	log = l
+	setucore.StartSetuCore(b.DB, l)
 	px := &pixiv.Provider{}
-	RegisterProvider(px, b, b.DB)
+	loli := &lolicon.Provider{}
+	setucore.RegisterProvider(px, log.WithField("SetuProvider", "Pixiv Core"), b)
+	setucore.RegisterProvider(loli, log.WithField("SetuProvider", "Lolicon Core"), b)
 	_, err := b.AddEvent(OPQBot.EventNameOnGroupMessage, func(qq int64, packet *OPQBot.GroupMsgPack) {
 		if packet.FromUserID != b.QQ {
 			//cm := strings.Split(packet.Content, " ")
 			cm := strings.SplitN(packet.Content, " ", 2)
+			if len(cm) >= 2 && cm[0] == "爬取" && packet.FromUserID == Config.CoreConfig.SuperAdminUin {
+				df := 100
+				if count, err := strconv.Atoi(cm[1]); err == nil && count > 1 {
+					df = count
+					if count > 5000 {
+						df = 5000
+					}
+				}
+				b.SendGroupTextMsg(packet.FromGroupID, "开始爬取")
+				getNum := 0
+				maxtryCont := 70
+				for i := 0; getNum < df; i++ {
+					tmp, err := loli.SearchPicToDB()
+					if err != nil {
+						break
+					}
+					if tmp == 0 {
+						break
+					}
+					if i > maxtryCont {
+						break
+					}
+					getNum += tmp
+				}
+				b.SendGroupTextMsg(packet.FromGroupID, "爬取了"+strconv.Itoa(getNum)+"张")
+			}
+
 			command, _ := regexp.Compile("搜([0-9]+)张图")
 			if len(cm) >= 2 && command.MatchString(cm[0]) {
 				getNum := 1
@@ -225,9 +256,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				}
 				if len(pics) == 0 {
 					ctx.JSON(GroupManager.WebResult{
-						Code: 1,
-						Info: "无法取出图片！",
-						Data: nil,
+						Code:    1,
+						Message: "无法取出图片！",
+						Data:    nil,
 					})
 					return
 				}
@@ -240,9 +271,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					return
 				}
 				ctx.JSON(GroupManager.WebResult{
-					Code: 0,
-					Info: "success",
-					Data: pics,
+					Code:    0,
+					Message: "success",
+					Data:    pics,
 				})
 			} else {
 				pics, err := px.SearchPicFromUser(author, "", r18, 1)
@@ -252,9 +283,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				}
 				if len(pics) == 0 {
 					ctx.JSON(GroupManager.WebResult{
-						Code: 1,
-						Info: "无法取出图片！",
-						Data: nil,
+						Code:    1,
+						Message: "无法取出图片！",
+						Data:    nil,
 					})
 					return
 				}
@@ -267,9 +298,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					return
 				}
 				ctx.JSON(GroupManager.WebResult{
-					Code: 0,
-					Info: "success",
-					Data: pics,
+					Code:    0,
+					Message: "success",
+					Data:    pics,
 				})
 			}
 
@@ -277,7 +308,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		}
 		//ctx.JSON(GroupManager.WebResult{
 		//	Code: 1,
-		//	Info: "参数错误",
+		//	Message: "参数错误",
 		//	Data: nil,
 		//})
 		pics, err := px.SearchPic(word, r18, 1)
@@ -287,9 +318,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 		}
 		if len(pics) == 0 {
 			ctx.JSON(GroupManager.WebResult{
-				Code: 1,
-				Info: "无法取出图片！",
-				Data: nil,
+				Code:    1,
+				Message: "无法取出图片！",
+				Data:    nil,
 			})
 			return
 		}
@@ -302,9 +333,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			return
 		}
 		ctx.JSON(GroupManager.WebResult{
-			Code: 0,
-			Info: "success",
-			Data: pics,
+			Code:    0,
+			Message: "success",
+			Data:    pics,
 		})
 
 	})
@@ -312,7 +343,4 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 }
 func init() {
 	Core.RegisterModule(&Module{})
-}
-func RegisterProvider(p setucore.Provider, bot *Core.Bot, db *gorm.DB) {
-	p.InitProvider(log.WithField("SetuProvider", "Pixiv Core"), bot, db)
 }

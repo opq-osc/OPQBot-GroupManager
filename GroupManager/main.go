@@ -35,9 +35,9 @@ import (
 var staticFs embed.FS
 
 type WebResult struct {
-	Code int         `json:"code"`
-	Info string      `json:"info"`
-	Data interface{} `json:"data"`
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
 }
 type AtMsg struct {
 	Content string `json:"Content"`
@@ -485,15 +485,15 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			Config.Lock.RUnlock()
 			return
 		}
-		if a, _ := regexp.MatchString("聊天|无聊", packet.Content); a {
-			Config.Lock.Lock()
-			c.EnableChat = true
-			Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
-			Config.Save()
-			Config.Lock.Unlock()
-			b.SendGroupTextMsg(packet.FromGroupID, "你可以at我和我聊天哟😉")
-			return
-		}
+		//if a, _ := regexp.MatchString("聊天|无聊", packet.Content); a {
+		//	Config.Lock.Lock()
+		//	c.EnableChat = true
+		//	Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
+		//	Config.Save()
+		//	Config.Lock.Unlock()
+		//	b.SendGroupTextMsg(packet.FromGroupID, "你可以at我和我聊天哟😉")
+		//	return
+		//}
 		if packet.Content == "当前聊天数据库" {
 			if chat.SelectCore == "" {
 				b.SendGroupTextMsg(packet.FromGroupID, "当前没有设置")
@@ -571,18 +571,18 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			b.SendGroupTextMsg(packet.FromGroupID, "设置聊天数据库为"+cm[1])
 			return
 		}
-		if a, _ := regexp.MatchString("关闭|无路赛|吵|别说话|闭嘴", packet.Content); a {
-			Config.Lock.Lock()
-			if c.Enable == true {
-				c.EnableChat = false
-				b.SendGroupTextMsg(packet.FromGroupID, "关闭了聊天功能")
-				Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
-				Config.Save()
-			}
-			Config.Lock.Unlock()
-			return
-		}
-		if c.EnableChat && packet.MsgType == "AtMsg" {
+		//if a, _ := regexp.MatchString("关闭|无路赛|吵|别说话|闭嘴", packet.Content); a {
+		//	Config.Lock.Lock()
+		//	if c.Enable == true {
+		//		c.EnableChat = false
+		//		b.SendGroupTextMsg(packet.FromGroupID, "关闭了聊天功能")
+		//		Config.CoreConfig.GroupConfig[packet.FromGroupID] = c
+		//		Config.Save()
+		//	}
+		//	Config.Lock.Unlock()
+		//	return
+		//}
+		if packet.MsgType == "AtMsg" {
 			//var atInfo AtMsg
 			//err := json.Unmarshal([]byte(packet.Content),&atInfo)
 			//if err != nil{
@@ -700,25 +700,25 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			word := ctx.URLParamDefault("s", "")
 			if word == "" {
 				ctx.JSON(WebResult{
-					Code: 0,
-					Info: "success",
-					Data: "你想要问米娅什么事情呢？？",
+					Code:    0,
+					Message: "success",
+					Data:    "你想要问米娅什么事情呢？？",
 				})
 				return
 			}
 			a, err := chat.GetAnswer(word, 0, 0)
 			if err != nil {
 				ctx.JSON(WebResult{
-					Code: 1,
-					Info: "error",
-					Data: err.Error(),
+					Code:    1,
+					Message: "error",
+					Data:    err.Error(),
 				})
 				return
 			}
 			ctx.JSON(WebResult{
-				Code: 0,
-				Info: "success",
-				Data: a,
+				Code:    0,
+				Message: "success",
+				Data:    a,
 			})
 			return
 		})
@@ -728,7 +728,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			keyTmp := utils.Md5V(strconv.Itoa(salt + rand.Intn(100)))
 			s.Set("OPQWebCSRF", keyTmp)
 			ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
-			_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: s.Get("username")})
+			_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: s.Get("username")})
 		})
 		App.Get("/api/status", func(ctx iris.Context) {
 			s := sess.Start(ctx)
@@ -737,10 +737,10 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			s.Set("OPQWebCSRF", keyTmp)
 			ctx.SetCookieKV("OPQWebCSRF", keyTmp, iris.CookieHTTPOnly(false))
 			if s.GetBooleanDefault("auth", false) {
-				_, _ = ctx.JSON(WebResult{Code: 1, Info: "已登录!", Data: s.Get("username")})
+				_, _ = ctx.JSON(WebResult{Code: 1, Message: "已登录!", Data: s.Get("username")})
 				return
 			} else {
-				_, _ = ctx.JSON(WebResult{Code: 0, Info: "未登录!", Data: nil})
+				_, _ = ctx.JSON(WebResult{Code: 0, Message: "未登录!", Data: nil})
 				return
 			}
 		})
@@ -752,10 +752,10 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			if username == Config.CoreConfig.OPQWebConfig.Username && password == utils.Md5V(Config.CoreConfig.OPQWebConfig.Password) {
 				s := sess.Start(ctx)
 				s.Set("auth", true)
-				_, _ = ctx.JSON(WebResult{Code: 1, Info: "登录成功", Data: nil})
+				_, _ = ctx.JSON(WebResult{Code: 1, Message: "登录成功", Data: nil})
 				return
 			} else {
-				_, _ = ctx.JSON(WebResult{Code: 0, Info: "用户名密码错误!", Data: nil})
+				_, _ = ctx.JSON(WebResult{Code: 0, Message: "用户名密码错误!", Data: nil})
 				return
 			}
 
@@ -821,17 +821,17 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					ids := ctx.FormValue("id")
 					id, err := strconv.ParseInt(ids, 10, 64)
 					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 						return
 					}
 					if id == -1 {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: "默认群禁止添加周期任务", Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: "默认群禁止添加周期任务", Data: nil})
 						return
 					}
 					span := ctx.FormValue("span")
 					jobName := ctx.FormValue("jobName")
 					if jobName == "" {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: "jobName为空", Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: "jobName为空", Data: nil})
 						return
 					}
 					cronType, _ := strconv.Atoi(ctx.FormValue("type"))
@@ -847,7 +847,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 							}
 						})
 						if err != nil {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 							return
 						} else {
 							job := Config.Job{Type: cronType, Cron: span, Title: title, Content: content}
@@ -862,7 +862,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 								Config.CoreConfig.GroupConfig[id] = v
 							}
 							Config.Save()
-							_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+							_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: nil})
 							return
 						}
 					// 全局禁言
@@ -874,7 +874,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 							}
 						})
 						if err != nil {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 							return
 						} else {
 							job := Config.Job{Type: cronType, Cron: span}
@@ -889,7 +889,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 								Config.CoreConfig.GroupConfig[id] = v
 							}
 							Config.Save()
-							_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+							_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: nil})
 							return
 						}
 					// 解除全局禁言
@@ -901,7 +901,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 							}
 						})
 						if err != nil {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 							return
 						} else {
 							job := Config.Job{Type: cronType, Cron: span}
@@ -916,7 +916,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 								Config.CoreConfig.GroupConfig[id] = v
 							}
 							Config.Save()
-							_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+							_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: nil})
 							return
 						}
 					case 4:
@@ -933,7 +933,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 							})
 						})
 						if err != nil {
-							_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+							_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 							return
 						} else {
 							job := Config.Job{Type: cronType, Cron: span, Content: content}
@@ -948,11 +948,11 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 								Config.CoreConfig.GroupConfig[id] = v
 							}
 							Config.Save()
-							_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+							_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: nil})
 							return
 						}
 					default:
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: "类型不存在", Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: "类型不存在", Data: nil})
 						return
 					}
 				})
@@ -960,22 +960,22 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					ids := ctx.FormValue("id")
 					id, err := strconv.ParseInt(ids, 10, 64)
 					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 						return
 					}
 					if id == -1 {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: "默认群禁止删除周期任务", Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: "默认群禁止删除周期任务", Data: nil})
 						return
 					}
 					jobName := ctx.FormValue("jobName")
 					if jobName == "" {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: "jobName为空", Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: "jobName为空", Data: nil})
 						return
 					}
 					err = b.BotCronManager.Remove(id, jobName)
 
 					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 						return
 					}
 					Config.Lock.Lock()
@@ -984,28 +984,28 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 						delete(v.Job, jobName)
 						Config.CoreConfig.GroupConfig[id] = v
 					} else {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: "Group在配置文件中不存在！", Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: "Group在配置文件中不存在！", Data: nil})
 						return
 					}
 					Config.Save()
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: nil})
 				})
 			}
 			needAuth.Post("/getGroupMember", func(ctx iris.Context) {
 				ids := ctx.FormValue("id")
 				id, err := strconv.ParseInt(ids, 10, 64)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				if id == -1 {
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: []int{}})
+					_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: []int{}})
 					return
 				}
 
 				glist, err := b.GetGroupMemberList(id, 0)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				result := glist
@@ -1015,14 +1015,14 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					}
 					glist, err = b.GetGroupMemberList(id, glist.LastUin)
 					if err != nil {
-						_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+						_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 						return
 					}
 					result.MemberList = append(result.MemberList, glist.MemberList...)
 					result.Count += glist.Count
 					result.LastUin = glist.LastUin
 				}
-				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: result})
+				_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: result})
 				return
 			})
 			needAuth.Post("/setGroupConfig", func(ctx iris.Context) {
@@ -1030,7 +1030,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				enable := ctx.FormValue("enable")
 				id, err := strconv.ParseInt(ids, 10, 64)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				if enable != "" {
@@ -1040,9 +1040,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					if id == -1 {
 						Config.CoreConfig.DefaultGroupConfig.Enable = Enable
 						_, _ = ctx.JSON(WebResult{
-							Code: 1,
-							Info: "默认配置保存成功!",
-							Data: Config.CoreConfig.GroupConfig[id].Enable,
+							Code:    1,
+							Message: "默认配置保存成功!",
+							Data:    Config.CoreConfig.GroupConfig[id].Enable,
 						})
 						err := Config.Save()
 						if err != nil {
@@ -1059,9 +1059,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 						Config.CoreConfig.GroupConfig[id] = v
 					}
 					_, _ = ctx.JSON(WebResult{
-						Code: 1,
-						Info: "保存成功!",
-						Data: Config.CoreConfig.GroupConfig[id].Enable,
+						Code:    1,
+						Message: "保存成功!",
+						Data:    Config.CoreConfig.GroupConfig[id].Enable,
 					})
 					err := Config.Save()
 					if err != nil {
@@ -1112,18 +1112,18 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					Config.CoreConfig.DefaultGroupConfig = Config.GroupConfig{BiliUps: map[int64]Config.Up{}, Bili: Bili, Job: Job, JoinVerifyType: JoinVerifyType, Welcome: Welcome, SignIn: SignIn, Zan: Zan, JoinVerifyTime: JoinVerifyTime, JoinAutoShutUpTime: JoinAutoShutUpTime, AdminUin: AdminUin, Menu: menuData, MenuKeyWord: menuKeyWordData, Enable: Enable, ShutUpWord: ShutUpWord, ShutUpTime: ShutUpTime}
 					Config.Save()
 					_, _ = ctx.JSON(WebResult{
-						Code: 1,
-						Info: "默认配置，保存成功!",
-						Data: nil,
+						Code:    1,
+						Message: "默认配置，保存成功!",
+						Data:    nil,
 					})
 					return
 				}
 				Config.CoreConfig.GroupConfig[id] = Config.GroupConfig{BiliUps: Config.CoreConfig.GroupConfig[id].BiliUps, Bili: Bili, Job: Job, JoinVerifyType: JoinVerifyType, Welcome: Welcome, SignIn: SignIn, Zan: Zan, JoinVerifyTime: JoinVerifyTime, JoinAutoShutUpTime: JoinAutoShutUpTime, AdminUin: AdminUin, Menu: menuData, MenuKeyWord: menuKeyWordData, Enable: Enable, ShutUpWord: ShutUpWord, ShutUpTime: ShutUpTime}
 				Config.Save()
 				_, _ = ctx.JSON(WebResult{
-					Code: 1,
-					Info: "保存成功!",
-					Data: nil,
+					Code:    1,
+					Message: "保存成功!",
+					Data:    nil,
 				})
 				return
 			})
@@ -1131,20 +1131,20 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				ids := ctx.FormValue("id")
 				id, err := strconv.ParseInt(ids, 10, 64)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				Config.Lock.RLock()
 				defer Config.Lock.RUnlock()
 				if id == -1 {
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: Config.CoreConfig.DefaultGroupConfig})
+					_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: Config.CoreConfig.DefaultGroupConfig})
 					return
 				}
 				if v, ok := Config.CoreConfig.GroupConfig[id]; ok {
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: v})
+					_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: v})
 					return
 				} else {
-					_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: Config.CoreConfig.DefaultGroupConfig})
+					_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: Config.CoreConfig.DefaultGroupConfig})
 					return
 				}
 			})
@@ -1152,16 +1152,16 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				g, err := b.GetGroupList("")
 				if err != nil {
 					_, _ = ctx.JSON(WebResult{
-						Code: 0,
-						Info: err.Error(),
-						Data: nil,
+						Code:    0,
+						Message: err.Error(),
+						Data:    nil,
 					})
 					return
 				}
 				_, _ = ctx.JSON(WebResult{
-					Code: 1,
-					Info: "success",
-					Data: g,
+					Code:    1,
+					Message: "success",
+					Data:    g,
 				})
 			})
 			needAuth.Post("/shutUp", func(ctx iris.Context) {
@@ -1170,25 +1170,25 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				times := ctx.FormValue("time")
 				id, err := strconv.ParseInt(ids, 10, 64)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				uin, err := strconv.ParseInt(uins, 10, 64)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				time1, err := strconv.Atoi(times)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				err = b.SetForbidden(1, time1, id, uin)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
-				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+				_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: nil})
 				return
 			})
 			needAuth.Post("/kick", func(ctx iris.Context) {
@@ -1196,20 +1196,20 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				uins := ctx.FormValue("uin")
 				id, err := strconv.ParseInt(ids, 10, 64)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				uin, err := strconv.ParseInt(uins, 10, 64)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
 				err = b.KickGroupMember(id, uin)
 				if err != nil {
-					_, _ = ctx.JSON(WebResult{Code: 0, Info: err.Error(), Data: nil})
+					_, _ = ctx.JSON(WebResult{Code: 0, Message: err.Error(), Data: nil})
 					return
 				}
-				_, _ = ctx.JSON(WebResult{Code: 1, Info: "success", Data: nil})
+				_, _ = ctx.JSON(WebResult{Code: 1, Message: "success", Data: nil})
 				return
 			})
 			needAuth.Get("/logout", func(ctx iris.Context) {
@@ -1217,9 +1217,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				s.Set("auth", false)
 				s.Clear()
 				_, _ = ctx.JSON(WebResult{
-					Code: 1,
-					Info: "Success",
-					Data: nil,
+					Code:    1,
+					Message: "Success",
+					Data:    nil,
 				})
 			})
 		}
@@ -1237,9 +1237,9 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					plugins = append(plugins, v.ModuleInfo())
 				}
 				ctx.JSON(WebResult{
-					Code: 0,
-					Info: "success",
-					Data: plugins,
+					Code:    0,
+					Message: "success",
+					Data:    plugins,
 				})
 
 			})
@@ -1301,7 +1301,7 @@ func requireAppLogin(ctx iris.Context) {
 	if s.GetBooleanDefault("appAuth", false) {
 		ctx.Next()
 	} else {
-		_, _ = ctx.JSON(WebResult{Code: 10010, Info: "App 未登录!", Data: nil})
+		_, _ = ctx.JSON(WebResult{Code: 10010, Message: "App 未登录!", Data: nil})
 		return
 	}
 }
@@ -1310,7 +1310,7 @@ func requireAuth(ctx iris.Context) {
 	if s.GetBooleanDefault("auth", false) {
 		ctx.Next()
 	} else {
-		_, _ = ctx.JSON(WebResult{Code: 10010, Info: "未登录!", Data: nil})
+		_, _ = ctx.JSON(WebResult{Code: 10010, Message: "未登录!", Data: nil})
 		return
 	}
 }
@@ -1340,7 +1340,7 @@ func beforeCsrf(ctx iris.Context) {
 			}
 
 			ctx.StatusCode(419)
-			_, _ = ctx.JSON(WebResult{Code: 419, Info: "CSRF Error!", Data: nil})
+			_, _ = ctx.JSON(WebResult{Code: 419, Message: "CSRF Error!", Data: nil})
 			return
 		}
 	} else {
