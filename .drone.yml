@@ -2,16 +2,34 @@
 kind: pipeline
 name: default
 steps:
- -  name: Build Web
- image: node
- commands:
- -  export NODE_OPTIONS=--openssl-legacy-provider
- -  npm config set registry https://registry.npmjs.org
- -  yarn config set registry https://registry.yarnpkg.com
- -  npm install -g @quasar/cli
- -  chmod +x upx.sh;cd GroupManager/Web;yarn install;quasar build
+ - name: fetch
+   image: docker:git
+   commands:
+    - git fetch --tags
+ - name: Build Web
+   image: node
+   commands:
+    -  export NODE_OPTIONS=--openssl-legacy-provider
+    -  npm config set registry https://registry.npmjs.org
+    -  yarn config set registry https://registry.yarnpkg.com
+    -  npm install -g @quasar/cli
+    -  cd GroupManager/Web;yarn install;quasar build
  - name: test
- image: golang
- commands:
- -  go mod tidy
- -  go test -v ./... 
+   image: golang
+   commands:
+    -  go mod tidy
+    -  go test -v ./... 
+ - name: release
+   image: goreleaser/goreleaser
+   environment:
+     GITEA_TOKEN:
+       from_secret: GITEA_TOKEN
+   commands:
+      - goreleaser release
+   when:
+     event: tag
+gitea_urls:
+  api: https://git.mcenjoy.cn/api/v1/
+  download: https://git.mcenjoy.cn
+  # set to true if you use a self-signed certificate
+  skip_tls_verify: true

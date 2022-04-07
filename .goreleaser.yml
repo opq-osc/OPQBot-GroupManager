@@ -35,8 +35,6 @@ builds:
         goarch: arm64
       - goos: android
         goarch: 386
-    hooks:
-      post: ./upx.sh {{ .Os }} {{ .Path }}
 archives:
   -
     name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
@@ -66,3 +64,8 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+gitea_urls:
+  api: https://git.mcenjoy.cn/api/v1/
+  download: https://git.mcenjoy.cn
+  # set to true if you use a self-signed certificate
+  skip_tls_verify: true
