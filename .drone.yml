@@ -1,0 +1,17 @@
+# .drone.yml
+kind: pipeline
+name: default
+steps:
+ -  name: Build Web
+ image: node
+ commands:
+ -  export NODE_OPTIONS=--openssl-legacy-provider
+ -  npm config set registry https://registry.npmjs.org
+ -  yarn config set registry https://registry.yarnpkg.com
+ -  npm install -g @quasar/cli
+ -  chmod +x upx.sh;cd GroupManager/Web;yarn install;quasar build
+ - name: test
+ image: golang
+ commands:
+ -  go mod tidy
+ -  go test -v ./... 
