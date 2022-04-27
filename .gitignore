@@ -14,3 +14,4 @@ _*
 dist/
 OPQBot-QQGroupManager
 !.goreleaser.yml
+*_test.go
