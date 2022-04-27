@@ -5,9 +5,11 @@ import (
 	"OPQBot-QQGroupManager/Core"
 	"OPQBot-QQGroupManager/GroupManager/Chat"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Local"
+
 	//_ "OPQBot-QQGroupManager/GroupManager/Chat/XiaoI"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Moli"
 	_ "OPQBot-QQGroupManager/GroupManager/Chat/Zhai"
+	_ "OPQBot-QQGroupManager/GroupManager/Chat/Zhai2"
 	"OPQBot-QQGroupManager/GroupManager/QunInfo"
 	"OPQBot-QQGroupManager/draw"
 	"OPQBot-QQGroupManager/utils"
@@ -15,10 +17,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/kataras/iris/v12"
-	"github.com/kataras/iris/v12/sessions"
-	"github.com/mcoo/OPQBot"
-	"github.com/sirupsen/logrus"
 	"io/fs"
 	"math/rand"
 	"net/http"
@@ -29,6 +27,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kataras/iris/v12"
+	"github.com/kataras/iris/v12/sessions"
+	"github.com/mcoo/OPQBot"
+	"github.com/sirupsen/logrus"
 )
 
 //go:embed Web/dist/spa
@@ -220,8 +223,6 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 					return
 				}
 				groupId, err := strconv.ParseInt(cm[1], 10, 64)
-
-				rand.Seed(time.Now().Unix())
 				a1 := rand.Intn(100)
 				a2 := rand.Intn(100)
 				err = s.Set("c_result", a1+a2)
@@ -499,7 +500,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				b.SendGroupTextMsg(packet.FromGroupID, "当前没有设置")
 				return
 			}
-			b.SendGroupTextMsg(packet.FromGroupID, "设置聊天数据库为"+chat.SelectCore)
+			b.SendGroupTextMsg(packet.FromGroupID, "当前设置聊天数据库为"+chat.SelectCore)
 			return
 		}
 		cm := strings.Split(packet.Content, " ")
@@ -553,14 +554,19 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 			return
 		}
 		if len(cm) >= 3 && cm[0] == "教你" {
-			tmp := strings.SplitN(packet.Content, " ", 3)
-			err := chat.Learn(tmp[1], tmp[2], packet.FromGroupID, packet.FromUserID)
-			if err != nil {
-				b.SendGroupTextMsg(packet.FromGroupID, "学习出现问题")
+			Config.Lock.RLock()
+			if Config.CoreConfig.SuperAdminUin == packet.FromUserID {
+				tmp := strings.SplitN(packet.Content, " ", 3)
+				err := chat.Learn(tmp[1], tmp[2], packet.FromGroupID, packet.FromUserID)
+				if err != nil {
+					b.SendGroupTextMsg(packet.FromGroupID, "学习出现问题")
+					return
+				}
+				b.SendGroupTextMsg(packet.FromGroupID, "已经学会了")
 				return
 			}
-			b.SendGroupTextMsg(packet.FromGroupID, "已经学会了")
 			return
+
 		}
 		if len(cm) == 2 && cm[0] == "设置聊天数据库" {
 			err = chat.SetChatDB(cm[1])
@@ -609,29 +615,42 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				atInfo.Content = strings.TrimSpace(strings.ReplaceAll(atInfo.Content, "@"+v.QQNick, ""))
 			}
 
-			answer, err := chat.GetAnswer(OPQBot.DecodeFaceFromSentences(atInfo.Content, "%s"), packet.FromGroupID, packet.FromUserID)
+			answer, pic, err := chat.GetAnswer(OPQBot.DecodeFaceFromSentences(atInfo.Content, "%s"), packet.FromGroupID, packet.FromUserID)
 			if err != nil {
 				log.Warn(err)
 				return
 			}
-			b.Send(OPQBot.SendMsgPack{
-				SendToType: OPQBot.SendToTypeGroup,
-				ToUserUid:  packet.FromGroupID,
-				Content: OPQBot.SendTypeReplyContent{
-					ReplayInfo: struct {
-						MsgSeq     int    `json:"MsgSeq"`
-						MsgTime    int    `json:"MsgTime"`
-						UserID     int64  `json:"UserID"`
-						RawContent string `json:"RawContent"`
-					}{MsgSeq: packet.MsgSeq,
-						MsgTime:    packet.MsgTime,
-						UserID:     packet.FromUserID,
-						RawContent: atInfo.Content,
+			if pic == nil {
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypeGroup,
+					ToUserUid:  packet.FromGroupID,
+					Content: OPQBot.SendTypeReplyContent{
+						ReplayInfo: struct {
+							MsgSeq     int    `json:"MsgSeq"`
+							MsgTime    int    `json:"MsgTime"`
+							UserID     int64  `json:"UserID"`
+							RawContent string `json:"RawContent"`
+						}{MsgSeq: packet.MsgSeq,
+							MsgTime:    packet.MsgTime,
+							UserID:     packet.FromUserID,
+							RawContent: atInfo.Content,
+						},
+						Content: strings.ReplaceAll(answer, "[YOU]", packet.FromNickName),
 					},
-					Content: strings.ReplaceAll(answer, "[YOU]", packet.FromNickName),
-				},
-				CallbackFunc: nil,
-			})
+					CallbackFunc: nil,
+				})
+			} else {
+				b.Send(OPQBot.SendMsgPack{
+					SendToType: OPQBot.SendToTypeGroup,
+					ToUserUid:  packet.FromGroupID,
+					Content: OPQBot.SendTypePicMsgByBase64Content{
+						Base64:  base64.StdEncoding.EncodeToString(pic),
+						Content: "[PICFLAG]" + OPQBot.MacroAt([]int64{packet.FromUserID}) + strings.ReplaceAll(answer, "[YOU]", packet.FromNickName),
+					},
+					CallbackFunc: nil,
+				})
+			}
+
 			//b.SendGroupTextMsg(packet.FromGroupID, )
 		}
 	})
@@ -706,7 +725,7 @@ func (m *Module) ModuleInit(b *Core.Bot, l *logrus.Entry) error {
 				})
 				return
 			}
-			a, err := chat.GetAnswer(word, 0, 0)
+			a, _, err := chat.GetAnswer(word, 0, 0)
 			if err != nil {
 				ctx.JSON(WebResult{
 					Code:    1,

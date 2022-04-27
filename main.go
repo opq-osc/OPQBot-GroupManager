@@ -13,10 +13,19 @@ import (
 	_ "OPQBot-QQGroupManager/setu"
 	_ "OPQBot-QQGroupManager/taobao"
 	_ "OPQBot-QQGroupManager/wordCloud"
+	"bytes"
+	_ "embed"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
+	"strings"
+	"time"
+
+	"github.com/dimiro1/banner"
+	"github.com/mattn/go-colorable"
+	"github.com/sirupsen/logrus"
+
 	//_ "OPQBot-QQGroupManager/steam"
 	"OPQBot-QQGroupManager/utils"
 
@@ -24,13 +33,22 @@ import (
 	"github.com/mcoo/OPQBot"
 )
 
+//go:embed logo.txt
+var logo string
+
 var (
 	version = "unknown"
 	date    = "none"
 	log     *logrus.Logger
 )
 
+func init() {
+	rand.Seed(time.Now().Unix())
+}
 func main() {
+	isEnabled := true
+	isColorEnabled := true
+	banner.Init(colorable.NewColorableStdout(), isEnabled, isColorEnabled, bytes.NewBufferString(strings.ReplaceAll(logo, "{{ .version }}", version)))
 	log = Core.GetLog()
 	if Config.CoreConfig.LogLevel != "" {
 		switch Config.CoreConfig.LogLevel {
@@ -38,6 +56,7 @@ func main() {
 			log.SetLevel(logrus.InfoLevel)
 		case "debug":
 			log.SetLevel(logrus.DebugLevel)
+			log.SetReportCaller(true)
 		case "warn":
 			log.SetLevel(logrus.WarnLevel)
 		case "error":
