@@ -3,6 +3,7 @@ package Chat
 import (
 	"OPQBot-QQGroupManager/Config"
 	"errors"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,7 +18,7 @@ var (
 
 type ChatCore interface {
 	Init(l *logrus.Entry) error
-	GetAnswer(question string, GroupId, userId int64) string
+	GetAnswer(question string, GroupId, userId int64) (string, []byte)
 	AddAnswer(question, answer string, GroupId, userId int64) error
 	SetReplace(regexp string, target string) error
 }
@@ -54,6 +55,9 @@ func (m *Manager) Learn(Question, Answer string, GroupId, From int64) error {
 		return errors.New("本地聊天系统出现故障")
 	}
 }
+func (m *Manager) GetChatDB() string {
+	return m.SelectCore
+}
 func (m *Manager) SetChatDB(db string) error {
 	if _, ok := Providers[db]; ok {
 		m.SelectCore = db
@@ -65,17 +69,17 @@ func (m *Manager) SetChatDB(db string) error {
 	}
 	return errors.New("数据库不存在")
 }
-func (m *Manager) GetAnswer(question string, groupId, userId int64) (string, error) {
+func (m *Manager) GetAnswer(question string, groupId, userId int64) (string, []byte, error) {
 	// 查找本地对话数据库
 	if v, ok := Providers["local"]; ok {
-		if answer := v.GetAnswer(question, groupId, userId); answer != "" {
-			return answer, nil
+		if answer, pic := v.GetAnswer(question, groupId, userId); answer != "" || pic != nil {
+			return answer, pic, nil
 		}
 	}
 	// 联网查询默认对话数据库
 	if v, ok := Providers[m.SelectCore]; ok {
-		if answer := v.GetAnswer(question, groupId, userId); answer != "" {
-			return answer, nil
+		if answer, pic := v.GetAnswer(question, groupId, userId); answer != "" || pic != nil {
+			return answer, pic, nil
 		}
 	}
 	// 遍历其他数据库
@@ -83,11 +87,11 @@ func (m *Manager) GetAnswer(question string, groupId, userId int64) (string, err
 		if k == "local" || k == m.SelectCore {
 			continue
 		}
-		if answer := v.GetAnswer(question, groupId, userId); answer != "" {
-			return answer, nil
+		if answer, pic := v.GetAnswer(question, groupId, userId); answer != "" {
+			return answer, pic, nil
 		}
 	}
-	return "", errors.New("没有找到对话记录，无法回答")
+	return "", nil, errors.New("没有找到对话记录，无法回答")
 }
 func Register(name string, core ChatCore) error {
 	if _, ok := Providers[name]; ok {

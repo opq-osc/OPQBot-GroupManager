@@ -2,11 +2,11 @@ package Zhai
 
 import (
 	"OPQBot-QQGroupManager/GroupManager/Chat"
-	"github.com/mcoo/requests"
-	"github.com/sirupsen/logrus"
 	"math/rand"
 	"strings"
-	"time"
+
+	"github.com/mcoo/requests"
+	"github.com/sirupsen/logrus"
 )
 
 var log *logrus.Entry
@@ -28,17 +28,16 @@ func (c *Core) Init(l *logrus.Entry) error {
 	return nil
 }
 
-func (c *Core) GetAnswer(question string, GroupId, userId int64) string {
+func (c *Core) GetAnswer(question string, GroupId, userId int64) (string, []byte) {
 	for k, v := range c.Data {
 		if strings.Contains(question, k) {
 			if len(v) == 0 {
-				return ""
+				return "", nil
 			}
-			rand.Seed(time.Now().Unix())
-			return v[rand.Intn(len(v))]
+			return v[rand.Intn(len(v))], nil
 		}
 	}
-	return ""
+	return "", nil
 }
 
 func (c *Core) AddAnswer(question, answer string, GroupId, userId int64) error {

@@ -8,10 +8,14 @@ go.sum
 *.exe~
 *.dllq
 *.so
+*.txt
+*.db
 *.dylib
 *.log
 _*
 dist/
 OPQBot-QQGroupManager
 !.goreleaser.yml
+!logo.txt
 *_test.go
+chat.json

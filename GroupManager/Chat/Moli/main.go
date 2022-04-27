@@ -19,16 +19,16 @@ type Core struct {
 	secret  string
 }
 
-func (c *Core) GetAnswer(question string, GroupId, userId int64) string {
+func (c *Core) GetAnswer(question string, GroupId, userId int64) (string, []byte) {
 	res, err := requests.Get("http://i.itpk.cn/api.php?question=" + OPQBot.DecodeFaceFromSentences(question, "%s") + "&limit=8&api_key=" + c.key + "&api_secret=" + c.secret)
 	if err != nil {
 		log.Error(err)
-		return ""
+		return "", nil
 	}
 	if i, _ := regexp.MatchString(`http://`, res.Text()); i {
-		return ""
+		return "", nil
 	}
-	return strings.ReplaceAll(res.Text(), "茉莉", "米娅")
+	return strings.ReplaceAll(res.Text(), "茉莉", "米娅"), nil
 }
 
 func (c *Core) AddAnswer(question, answer string, GroupId, userId int64) error {

@@ -25,8 +25,8 @@ func Sha1(data string) string {
 type Core struct {
 }
 
-func (c *Core) GetAnswer(question string, GroupId, userId int64) string {
-	return ""
+func (c *Core) GetAnswer(question string, GroupId, userId int64) (string, []byte) {
+	return "", nil
 }
 
 func (c *Core) AddAnswer(question, answer string, GroupId, userId int64) error {
