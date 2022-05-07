@@ -107,7 +107,7 @@ func (b *Bot) PrintMemStats() {
 
 // Bot 内置了"周期任务","数据库"
 type Bot struct {
-	OPQBot.BotManager
+	*OPQBot.BotManager
 	BotCronManager utils.BotCron
 	Modules        map[string]*Module
 	DB             *gorm.DB
