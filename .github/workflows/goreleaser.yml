@@ -35,15 +35,29 @@ jobs:
         with:
           go-version: 1.16
       -
-        name: Tests
+        name: Install UPX
+        if: success() && startsWith(github.ref, 'refs/tags/')
+        run: |
+          sudo apt-get install upx-ucl
+      -
+        name: Tests & build
         run: |
           go mod tidy
           go test -v ./...
-#       -
-#         name: Install UPX
-#         if: success() && startsWith(github.ref, 'refs/tags/')
-#         run: |
-#           sudo apt-get install upx-ucl
+          go build -o opqbot-manager -ldflags="-s -w" .
+          upx opqbot-manager
+      -
+        name: Publish Docker
+        if: success() && startsWith(github.ref, 'refs/tags/')
+        env:
+          docker_repo: mcenjoy
+          image_name: opqbot-groupmanager
+          tag: latest
+        run: |
+          docker version
+          docker login --username=${{ secrets.DOCKER_USERNAME }} --password=${{ secrets.DOCKER_PASSWORD }}
+          docker build . --file Dockerfile --tag $docker_repo/$image_name:$tag
+          docker push $docker_repo/$image_name:$tag
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
