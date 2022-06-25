@@ -35,10 +35,19 @@ jobs:
         with:
           go-version: 1.16
       -
-        name: Tests & build
+        name: Tests
         run: |
           go mod tidy
           go test -v ./...
+      -
+        name: Build
+        if: success() && startsWith(github.ref, 'refs/tags/')
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o opqbot-manager-amd64 -ldflags="-s -w" .
+          GOOS=linux GOARCH=arm go build -o opqbot-manager-arm -ldflags="-s -w" .
+          GOOS=linux GOARCH=arm64 go build -o opqbot-manager-arm64 -ldflags="-s -w" .
+          GOOS=linux GOARCH=386 go build -o opqbot-manager-386 -ldflags="-s -w" .
+          ls
       -
         name: Set up QEMU
         if: success() && startsWith(github.ref, 'refs/tags/')
