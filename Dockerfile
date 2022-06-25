@@ -1,10 +1,11 @@
 FROM golang:alpine AS build
 WORKDIR $GOPATH/src
 COPY . .
-RUN apk add upx \
-    && go mod tidy\
+RUN go mod tidy\
     && go build -o opqbot-manager -ldflags="-s -w" . \
-    && upx opqbot-manager
+    && apk add upx \
+    && upx opqbot-manager \
+    || echo "UPX Install Failed!"
 
 FROM alpine:latest
 LABEL MAINTAINER enjoy<i@mcenjoy.cn>
