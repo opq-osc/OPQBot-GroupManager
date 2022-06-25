@@ -1,14 +1,17 @@
-FROM alpine:latest as build
-WORKDIR /apps
-COPY opqbot-manager /apps/
-RUN apk add upx && upx opqbot-manager
+FROM golang:alpine AS build
+WORKDIR $GOPATH/src
+COPY . .
+RUN apk add upx \
+    && go mod tidy\
+    && go build -o opqbot-manager -ldflags="-s -w" . \
+    && upx opqbot-manager
 
 FROM alpine:latest
 LABEL MAINTAINER enjoy<i@mcenjoy.cn>
 ENV VERSION 1.0
 # create a new dir
 WORKDIR /apps
-COPY --from=build /apps/opqbot-manager /apps/opqbot-manager
+COPY --from=build /go/src/opqbot-manager /apps/opqbot-manager
 
 COPY config.yaml.example /apps/config.yaml.example
 
