@@ -49,9 +49,9 @@ ENV VERSION 1.0
 # create a new dir
 WORKDIR /apps
 COPY --from=build /apps/opqbot-manager /apps/opqbot-manager
-
-COPY config.yaml.example /apps/config.yaml.example
-
+COPY config.yaml.example /apps/
+COPY font.ttf /apps/
+COPY dictionary.txt /apps/
 # 设置时区
 RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo 'Asia/Shanghai' >/etc/timezone
 
